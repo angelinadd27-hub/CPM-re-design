@@ -770,3 +770,6 @@
 
 /* Сводка отзывов без подложки */
 .rev-sum { padding: 0; margin-bottom: 12px; background: none; border-radius: 0; }
+
+/* Индикатор избранного в шапке серый */
+.hdr-link[aria-label="Избранное"] .badge-n { background: var(--surface-subtle); color: var(--text); }

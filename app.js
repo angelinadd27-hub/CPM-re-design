@@ -407,9 +407,9 @@
     const soon = (t) => `data-act="soon" data-text="${t}"`;
     return `<h1 class="vh">Свободный Рынок Миниатюр: маркет миниатюр, настольных и карточных игр</h1>
       <section class="adv"><div class="wrap adv-in">
-        <div class="adv-i">${ic('shield', 24)}<span><b>Работаем с 2018 года</b><span>Маркет сообщества</span></span></div>
-        <div class="adv-i">${ic('user', 24)}<span><b>Около 60 тысяч человек в месяц</b><span>Покупают и продают на СРМ</span></span></div>
-        <div class="adv-i hide-m-only">${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>После подтверждения заказа</span></span></div>
+        <div class="adv-i">${ic('shield', 24)}<span><b>Работаем с 2018 года</b><span>маркет сообщества</span></span></div>
+        <div class="adv-i">${ic('user', 24)}<span><b>60\u00a0000+ человек в месяц</b><span>покупают и продают на СРМ</span></span></div>
+        <div class="adv-i hide-m-only">${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span></div>
       </div></section>
       <section class="band first"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Текущие аукционы</h2><a class="link row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 14)}</a></div>

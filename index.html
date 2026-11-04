@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="assets/logo.png">
+<title>СРМ: проверка прототипа</title>
+<style>
+@font-face { font-family: 'Open Sans'; font-weight: 400; src: url('assets/fonts/OpenSans-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Open Sans'; font-weight: 600; src: url('assets/fonts/OpenSans-SemiBold.woff2') format('woff2'); }
+:root { --bg: #18181b; --bg2: #2b2b2f; --line: #45454b; --t: #fff; --t2: #cfcfd4; --t3: #a9a9b0; --stage: #e2e2e5; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { display: grid; grid-template-rows: auto minmax(0, 1fr); font: 400 13px/18px 'Open Sans', sans-serif; background: var(--stage); color: var(--t); overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+.bar { background: var(--bg); display: flex; align-items: center; gap: 16px; padding: 8px 12px; min-width: 0; }
+.bar .ttl { font-weight: 600; white-space: nowrap; }
+.steps { display: flex; gap: 2px; overflow-x: auto; flex: 1; min-width: 0; scrollbar-width: none; }
+.steps::-webkit-scrollbar { display: none; }
+.steps button { flex: none; padding: 4px 10px; border-radius: 4px; color: var(--t2); white-space: nowrap; }
+.steps button:hover { background: var(--bg2); }
+.steps button.on { background: #fff; color: #18181b; font-weight: 600; }
+.seg { display: flex; gap: 2px; background: var(--bg2); padding: 2px; border-radius: 6px; flex: none; }
+.seg button { padding: 4px 10px; border-radius: 4px; color: var(--t2); }
+.seg button.on { background: #fff; color: #18181b; font-weight: 600; }
+.lnk { color: var(--t2); text-decoration: underline; white-space: nowrap; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; min-height: 0; }
+body.no-side .main { grid-template-columns: minmax(0, 1fr); }
+body.no-side .side { display: none; }
+.stage { position: relative; overflow: hidden; display: flex; justify-content: center; align-items: flex-start; padding: 12px; min-width: 0; }
+.frame-box { background: #fff; box-shadow: 0 0 0 1px rgba(24,24,27,.16); transform-origin: top center; flex: none; }
+iframe { display: block; width: 100%; height: 100%; border: 0; }
+.scale { position: absolute; right: 16px; bottom: 12px; background: var(--bg); padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+.side { background: var(--bg); overflow: auto; padding: 12px; }
+.side h2 { font-size: 11px; line-height: 16px; letter-spacing: .04em; text-transform: uppercase; color: var(--t3); margin: 16px 0 8px; font-weight: 600; }
+.side h2:first-child { margin-top: 0; }
+.ctl { display: grid; gap: 4px; }
+.ctl button.act { text-align: left; padding: 6px 8px; border-radius: 4px; background: var(--bg2); color: var(--t); }
+.ctl button.act:hover { background: var(--line); }
+.tgl { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 4px; background: var(--bg2); cursor: pointer; }
+.tgl input { accent-color: #fb3939; margin: 0; }
+.sel { width: 100%; background: var(--bg2); color: var(--t); border: 0; padding: 6px; border-radius: 4px; font: inherit; }
+.ann { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ann li { padding: 8px; border-radius: 4px; background: var(--bg2); color: var(--t2); }
+.ann b { color: var(--t); font-weight: 600; display: block; }
+.ann .ref { display: block; margin-top: 2px; color: var(--t3); font-size: 12px; line-height: 16px; }
+.ann li.dev { border-left: 2px solid #eeb250; }
+.ann li.dev::before { content: 'Для разработки'; display: block; color: #eeb250; font-size: 11px; line-height: 16px; font-weight: 600; }
+@media (max-width: 900px) { .bar { flex-wrap: wrap; } .steps { order: 3; flex-basis: 100%; } .main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); } .side { display: none; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="ttl">СРМ · Покупка гостем</span>
+  <div class="steps" id="steps"></div>
+  <div class="seg" id="widths" aria-label="Ширина экрана"></div>
+  <button class="lnk" id="sideBtn">Панель</button>
+  <a class="lnk" href="app.html?v=56" target="_blank">Без панели</a>
+</div>
+<div class="main">
+  <div class="stage" id="stage">
+    <div class="frame-box" id="box"><iframe id="f" src="app.html?v=56#/" title="Прототип"></iframe></div>
+    <span class="scale" id="scale" hidden></span>
+  </div>
+  <aside class="side" id="side"></aside>
+</div>
+<script>
+const STEPS = [['home', 'Главная', '#/'], ['catalog', 'Каталог', '#/catalog'], ['item', 'Карточка', '#/item/strudd'], ['cart', 'Корзина', '#/cart'], ['checkout', 'Оформление', '#/checkout'], ['success', 'Успех', '#/success'], ['email', 'Письмо', '#/email']];
+const WIDTHS = [[360, '360'], [768, '768'], [1440, '1440'], [1920, '1920'], [0, 'Авто']];
+
+const NOTES = {
+  home: [
+    ['Факты о площадке под шапкой', 'Сделали строку с фактами: с 2018 года, около 60 тысяч человек в месяц, оплата напрямую продавцу, чтобы новый посетитель сразу понял, что площадке можно доверять', 'Продуктовый опыт'],
+    ['Шапка в две строки', 'Сделали так, чтобы при скролле уходили только разделы, язык и валюта, а логотип, каталог, поиск и значки оставались, чтобы каталог и поиск были под рукой на всей странице', 'UX'],
+    ['«Продать» на телефоне', 'Добавили «Продать» в шапку мобильной версии, чтобы продавец мог разместить объявление с любого экрана', 'Находки сайта'],
+    ['Подсказки в поиске', 'Сделали панель с частыми запросами, категориями и товарами с ценой и кнопкой покупки, чтобы найти и добавить товар, не открывая выдачу', 'UX'],
+    ['Аукционы выше категорий', 'Подняли аукционы на первый экран, чтобы лоты с обратным отсчётом не терялись под категориями', 'Продуктовый опыт. RICE 5'],
+    ['Таймер и ставки на карточке', 'Показали всем таймер и число ставок и отделили лот от товара значком молотка, чтобы больше людей открывало аукционы', 'CJM 3, этап 1. RICE 5'],
+    ['«Как проходит покупка»', 'Добавили блок из четырёх шагов, чтобы новый покупатель заранее знал, что сначала подтверждает продавец, а платит он потом и напрямую', 'CJM 1, этап 6'],
+    ['Продавцы с лучшими отзывами', 'Добавили продавцов с рейтингом и их товарами, чтобы покупатель выбирал из проверенных и меньше боялся незнакомых', 'Продуктовый опыт. RICE 2'],
+    ['Клубы и мероприятия вместе', 'Собрали два блока в один и опустили его ниже товаров, чтобы покупка шла первой, а сообщество оставалось на виду', 'Продуктовый опыт'],
+    ['«Есть что продать?»', 'Добавили блок для продавцов, чтобы главная работала и на вторую сторону площадки, а не только на покупателя', 'Продуктовый опыт'],
+  ],
+  catalog: [
+    ['Товары выше', 'Свернули теги в одну строку с «Показать ещё», чтобы товары были на первом экране, а не во второй его половине', 'CJM 1, этап 1. RICE 6'],
+    ['Категории в фильтрах по шагам', 'Перенесли ряды категорий в фильтры и показываем их по шагам: раздел, группа, подраздел, чтобы не искать нужное в длинном дереве и всегда видеть путь назад', 'CJM 1, этап 1. RICE 6'],
+    ['Короткие списки', 'Ограничили категории пятью пунктами до «Ещё», чтобы цена и продавец не уезжали вниз', 'UX'],
+    ['Главные фильтры раскрыты', 'Раскрыли категорию, цену, продавца и безопасность, остальное свернули, чтобы основные фильтры были сразу видны, а колонка не растягивалась на несколько экранов', 'UX'],
+    ['Фильтры применяются сразу', 'Убрали кнопку «Показать» на десктопе и показываем выбранное чипами над выдачей, чтобы сразу видеть результат и снимать фильтры по одному', 'UX'],
+    ['Кнопка вместо значка', 'Заменили маленький значок корзины на красную кнопку рядом с ценой, чтобы главное действие было заметно в выдаче', 'UX. RICE 7'],
+    ['Количество в карточке', 'Показываем счётчик вместо кнопки после добавления, чтобы менять количество, не уходя из выдачи', 'UX'],
+    ['Продавец на карточке', 'Добавили продавца, город и рейтинг, чтобы оценить продавца без перехода в объявление', 'CJM 1, этап 3. RICE 2'],
+    ['Плашки на фото', 'Вывели «Бесплатная доставка» и «Безопасная сделка» на карточку, чтобы условия были видны ещё до открытия объявления', 'Продуктовый опыт'],
+    ['Телефон: шторка фильтров', 'Собрали категории, фильтры и сортировку в шторку с кнопкой «Показать N», чтобы выдача начиналась сразу под шапкой', 'CJM 1, этап 1. RICE 6'],
+    ['Телефон: один фильтр', 'Открываем шторку только нужного фильтра по нажатию на чип, чтобы поправить его, не пролистывая все', 'UX'],
+    ['Телефон: вид выдачи', 'Добавили переключатель на одну или две карточки в ряд, чтобы выбирать между фото крупнее и большим числом товаров', 'UX'],
+  ],
+  item: [
+    ['Фокус на фото и покупке', 'Увеличили галерею и оставили одну главную кнопку, чтобы покупатель быстрее оценил лот', 'Flow 1. CJM 1, этап 2. RICE 7'],
+    ['Кнопка рядом с ценой', 'Поставили цену, избранное и кнопку покупки в один ряд, а после добавления показываем количество, чтобы действие не терялось среди равнозначных кнопок', 'Flow 1. RICE 7'],
+    ['Панель покупки на телефоне', 'Закрепили цену и кнопку внизу экрана, чтобы не листать до них почти 1000 px', 'Flow 2. CJM 1, этап 2. RICE 4'],
+    ['Рейтинг на виду', 'Вывели оценку и число отзывов в блок продавца, чтобы доверие появлялось до открытия вкладок', 'Flow 1. CJM 1, этап 3. RICE 2'],
+    ['Отзывы отдельной вкладкой', 'Сделали вкладку с разбивкой по звёздам и сортировкой, чтобы быстро понять, почему у продавца такая оценка', 'CJM 1, этап 3. RICE 2'],
+    ['Блок продавца на всех ширинах', 'Вывели блок из свёрнутой секции на 768 и 360, чтобы покупатель с телефона видел продавца без лишних нажатий', 'Находки сайта'],
+    ['Действия с продавцом значками', 'Сжали подписку, все товары и блокировку до значков с подписью, чтобы они не спорили с кнопкой покупки', 'Flow 1'],
+    ['Описание по блокам', 'Разделили характеристики и текст, добавили абзацы и «Показать полностью», чтобы длинное описание читалось и не отодвигало отзывы', 'UX'],
+    ['Без окна про Телеграм', 'Убрали поп-ап поверх блока продавца, чтобы он не отвлекал от решения о покупке', 'CJM 3, этап 2. RICE 27'],
+    ['Звёзды у каждого отзыва', 'Показали оценку звёздами вместо «положительный» и «отрицательный», чтобы отзывы читались быстрее. Нужно хранить оценку каждого отзыва: сейчас на сайте средний балл и знак отзыва, в прототипе разбивка примерная', '', true],
+  ],
+  cart: [
+    ['«Будет 2 заказа»', 'Предупреждаем заранее, что у каждого продавца свой заказ, срок и оплата, чтобы две оплаты не стали сюрпризом', 'Flow 4'],
+    ['Итог по каждому продавцу', 'Показали сумму в группе и в сводке, чтобы было понятно, сколько платить и кому', 'CJM 1, этап 4. RICE 14'],
+    ['Доставка отдельно', 'Написали, что доставка считается на следующем шаге, чтобы итог не вызывал вопросов и не приводил к отменам из-за неожиданной суммы', 'CJM 1, этап 4. RICE 14'],
+    ['Кнопка объясняет отказ', 'Показываем причину под кнопкой: товар закончился или мало до минимальной суммы, чтобы покупатель сразу знал, что поправить', 'Таблица валидаций'],
+    ['Удаление с отменой', 'Сделали отмену в уведомлении, чтобы случайно удалённый товар не приходилось искать заново', 'UX'],
+    ['Фото крупнее', 'Увеличили фото товара, чтобы покупатель узнавал лот в списке и сверял заказ перед оформлением', 'UX'],
+    ['Суммы в одном виде', 'Добавили разделитель разрядов на телефоне, чтобы крупные суммы читались так же, как на оформлении', 'Находки сайта'],
+    ['Количество у всех товаров', 'Показали количество у всех продавцов, чтобы покупатель не оформлял несколько заказов на одинаковые товары. Сейчас на сайте это только у PRO, предел в прототипе это остаток', '', true],
+  ],
+  checkout: [
+    ['Вход одной строкой', 'Заменили блок «Авторизация» строкой, чтобы форма стала короче, а гость сразу увидел, что вход не нужен', 'CJM 1, этап 5. RICE 3'],
+    ['Понятные шаги', 'Разбили форму на получателя, доставку и оплату, чтобы было видно, что осталось заполнить', 'Flow 3'],
+    ['Телефон: четыре шага', 'Разложили форму по шагам с проверкой в конце, чтобы не листать длинную страницу и видеть заказ целиком перед отправкой', 'Flow 3'],
+    ['Зачем данные получателя', 'Написали, что заказ выдадут по этим данным, чтобы человек проверил их и не ошибся с именем', 'Flow 3'],
+    ['Сначала доставка, потом адрес', 'Спрашиваем город, затем способ, и только потом адрес, если он нужен, чтобы было меньше ошибок и возвратов к форме', 'Flow 3. CJM 1, этап 5. RICE 29'],
+    ['Только доступная доставка', 'Убрали серые варианты без объяснения и показываем способы для выбранного города, чтобы было меньше вопросов о доставке', 'Flow 3. CJM 1, этап 5. RICE 9'],
+    ['Ошибки рядом с полем', 'Проверяем поле при выходе из него и ведём к первой ошибке при отправке, чтобы заказ нельзя было отправить без доставки и не приходилось искать, что не так', 'Flow 3'],
+    ['Оплата отдельным блоком', 'Вынесли способ оплаты, промокод и комментарий из доставки, чтобы необязательные поля не мешали главному', 'Flow 3. UX'],
+    ['Заметно про оплату', 'Написали «Сейчас платить не нужно» у кнопки, чтобы покупатель не ждал списания и не боялся нажать', 'CJM 1, этап 5'],
+    ['Предупреждение о доставке', 'Сказали, что сумму доставки подтвердит продавец, чтобы её изменение не стало неожиданностью', 'CJM 2, этап 2. RICE 14'],
+    ['«Оформить заказ»', 'Заменили «ПОДТВЕРДИТЬ», чтобы не путать действие покупателя с подтверждением продавца', 'UX'],
+    ['ФИО одним полем', 'Объединили три поля в одно, чтобы вводить быстрее. На сервере нужно разбирать строку или хранить одно поле', '', true],
+    ['Адрес отдельными полями', 'Разбили адрес на улицу, дом, квартиру и индекс, чтобы меньше ошибаться. На сервере одно поле адреса: нужно разбить или склеивать при сохранении', '', true],
+    ['Единый поиск города', 'Ищем город сразу, без выбора региона, чтобы не делать лишний шаг. Регион нужно определять по городу', '', true],
+    ['Улица не нужна при пункте выдачи', 'Не спрашиваем улицу у пунктов выдачи, чтобы не вводить лишнее. Сейчас сервер требует регион, город и улицу для всех доставок, кроме самовывоза', '', true],
+    ['Свой адрес у второго заказа', 'Дали отдельный адрес для заказа другого продавца, чтобы отправить его в другое место. Нужно хранить адрес на заказ', '', true],
+  ],
+  success: [
+    ['Честный срок', 'Назвали 48 часов и конкретную дату вместо «в течение суток», чтобы обещание совпадало с таймером и было меньше обращений', 'Flow 6. CJM 2, этап 2. RICE 8'],
+    ['Что будет дальше', 'Показали шаги и срок каждого сразу на экране, чтобы покупатель знал, чей ход и что случится, если не успеть', 'Flow 6, 7. CJM 2, этап 1. RICE 12, 28'],
+    ['Состав заказа', 'Вывели номер, статус, товары, доставку, оплату и итог, чтобы было меньше обращений «где мой заказ»', 'Flow 6. CJM 1, этап 6. RICE 11'],
+    ['Аккаунт создан: говорим прямо', 'Сообщаем логин и где взять пароль, чтобы гость знал, что зарегистрирован, и нашёл заказ, реквизиты и чек', 'Flow 5. CJM 1, этап 6. RICE 17'],
+    ['Телеграм внутри шагов', 'Перенесли подписку в «Что будет дальше», чтобы она читалась как способ следить за заказом, а не как реклама', 'Flow 6'],
+    ['Автовход после заказа', 'Кнопка ведёт на вход, потому что сейчас гость не входит автоматически. Предлагаем автовход, чтобы он сразу попадал в заказ', '', true],
+  ],
+  email: [
+    ['Письмо повторяет экран', 'Повторили срок, сумму, следующий шаг и блок про аккаунт, чтобы гость не потерял заказ, даже закрыв вкладку', 'Flow 5, 6. RICE 17'],
+    ['Честный срок в письме', 'Заменили «сутки» на 48 часов и дату, чтобы письмо не расходилось с таймером', 'Flow 6. RICE 8'],
+  ],
+};
+
+const HINTS = {
+  catalog: ['Работают цена, город, оригинальность, состояние, материал, комплектация, категории и поиск. «Продавец» и «Безопасность» только запоминаются: таких данных у лотов нет', 'Лотов 19, поэтому «по 48» и «по 96» выдачу не меняют'],
+  item: ['Включите «Вошедший пользователь» в состояниях, чтобы увидеть форму обсуждения'],
+  checkout: ['Промокод MINI10, сертификат GIFT500. Любой другой покажет ошибку'],
+  success: ['Варианты «Email есть в базе» и «Автоподтверждение у PRO» переключаются выше'],
+};
+
+const CTRLS = {
+  home: [],
+  catalog: [],
+  item: [{ t: 'flag', k: 'soldOut', l: 'Нет в наличии' }, { t: 'flag', k: 'auth', l: 'Вошедший пользователь' }],
+  cart: [{ t: 'preset', n: 'empty', l: 'Пустая корзина' }, { t: 'preset', n: 'one', l: 'Один продавец' }, { t: 'preset', n: 'two', l: 'Два продавца' }, { t: 'preset', n: 'three', l: 'Три товара у двух продавцов' }, { t: 'flag', k: 'itemOut', l: 'Товар закончился' }, { t: 'flag', k: 'partial', l: 'Остаток меньше выбранного' }, { t: 'flag', k: 'minSum', l: 'Минимальная сумма продавца' }],
+  checkout: [{ t: 'fill', l: 'Заполнить форму' }, { t: 'empty', l: 'Отправить пустую форму' }, { t: 'preset', n: 'two', l: 'Два продавца' }, { t: 'select', k: 'fail', l: 'Ответ сервера', o: [['none', 'Заказ создан'], ['changed', 'Сумма изменилась'], ['out', 'Товар закончился'], ['balance', 'Отрицательный баланс']] }],
+  success: [{ t: 'flag', k: 'emailExists', l: 'Email уже есть в базе' }, { t: 'flag', k: 'autoConfirm', l: 'Автоподтверждение у PRO' }],
+  email: [{ t: 'flag', k: 'emailExists', l: 'Email уже есть в базе' }, { t: 'flag', k: 'autoConfirm', l: 'Автоподтверждение у PRO' }],
+};
+
+const $ = (s) => document.querySelector(s);
+const f = $('#f'), box = $('#box'), stage = $('#stage'), scaleEl = $('#scale');
+let st = { route: 'home', flags: {} };
+let width = 1440;
+try { const w = localStorage.getItem('mfm-width'); if (w !== null) width = +w; } catch (e) { /* без хранилища */ }
+const send = (m) => f.contentWindow.postMessage(m, '*');
+const nb = (s) => s.replace(/(^|[\s(«—])(а|в|во|и|к|о|об|от|до|по|за|из|на|не|но|с|со|у|для|без|или|что)\s/gi, '$1$2 ');
+
+function layout() {
+  const aw = stage.clientWidth - 24, ah = stage.clientHeight - 24;
+  if (!width) { box.style.cssText = `width:${aw}px;height:${ah}px`; scaleEl.hidden = true; return; }
+  const s = Math.min(1, aw / width);
+  box.style.cssText = `width:${width}px;height:${Math.round(ah / s)}px;transform:scale(${s})`;
+  scaleEl.hidden = s === 1; scaleEl.textContent = Math.round(s * 100) + '%';
+}
+function drawTop() {
+  $('#steps').innerHTML = STEPS.map(([k, l]) => `<button data-s="${k}" class="${st.route === k ? 'on' : ''}">${l}</button>`).join('');
+  $('#widths').innerHTML = WIDTHS.map(([w, l]) => `<button data-w="${w}" class="${width === w ? 'on' : ''}">${l}</button>`).join('');
+}
+function drawSide() {
+  const c = CTRLS[st.route] || [];
+  const n = NOTES[st.route] || [];
+  const hints = HINTS[st.route] || [];
+  const ctl = c.map((x) => {
+    if (x.t === 'flag') return `<label class="tgl"><span>${x.l}</span><input type="checkbox" data-flag="${x.k}" ${st.flags[x.k] ? 'checked' : ''}></label>`;
+    if (x.t === 'preset') return `<button class="act" data-preset="${x.n}">${x.l}</button>`;
+    if (x.t === 'fill') return `<button class="act" data-fill>${x.l}</button>`;
+    if (x.t === 'empty') return `<button class="act" data-empty>${x.l}</button>`;
+    if (x.t === 'select') return `<label>${x.l}<select class="sel" data-sel="${x.k}" style="margin-top:4px">${x.o.map(([v, t]) => `<option value="${v}" ${st.flags[x.k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
+    return '';
+  }).join('');
+  $('#side').innerHTML = `${ctl ? `<h2>Состояния</h2><div class="ctl">${ctl}</div>` : ''}
+    <h2>Что изменили и почему</h2>
+    <ul class="ann">${n.map(([a, b, r, dev]) => `<li class="${dev ? 'dev' : ''}"><b>${nb(a)}</b>${nb(b)}${r ? `<span class="ref">${r}</span>` : ''}</li>`).join('')}</ul>
+    ${hints.length ? `<h2>Как проверить</h2><ul class="ann">${hints.map((t) => `<li>${nb(t)}</li>`).join('')}</ul>` : ''}
+    <h2>Прототип</h2><div class="ctl"><button class="act" data-reset>Начать сценарий заново</button></div>`;
+}
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'mfm-state') return;
+  const changed = e.data.route !== st.route || JSON.stringify(e.data.flags) !== JSON.stringify(st.flags);
+  st = e.data; drawTop(); if (changed) drawSide();
+});
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.dataset.s) { const s = STEPS.find(([k]) => k === t.dataset.s); send({ type: 'mfm-go', hash: s[2] }); }
+  if (t.dataset.w !== undefined) { width = +t.dataset.w; try { localStorage.setItem('mfm-width', width); } catch (e2) { /* без хранилища */ } drawTop(); layout(); }
+  if (t.dataset.preset) send({ type: 'mfm-preset', name: t.dataset.preset });
+  if ('fill' in t.dataset) send({ type: 'mfm-fill' });
+  if ('empty' in t.dataset) send({ type: 'mfm-empty-submit' });
+  if ('reset' in t.dataset) send({ type: 'mfm-reset' });
+  if (t.id === 'sideBtn') { document.body.classList.toggle('no-side'); layout(); }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.flag) send({ type: 'mfm-flag', key: t.dataset.flag, value: t.checked });
+  if (t.dataset.sel) send({ type: 'mfm-flag', key: t.dataset.sel, value: t.value });
+});
+window.addEventListener('resize', layout);
+drawTop(); drawSide(); layout();
+</script>
+</body>
+</html>

@@ -1,0 +1,772 @@
+/* Третья партия правок: поверх app.css */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Шапка */
+.hdr-top-row { height: 48px; padding-top: 8px; gap: 20px; }
+.hdr-top-l { width: 256px; flex: none; }
+.hdr-top-nav { font-weight: 400; }
+.hdr-top-nav a { line-height: 20px; }
+.brand { background: var(--surface-inverse); }
+.brand-cat { background: var(--brand); }
+.brand-cat:hover { background: var(--brand-hover); }
+.hdr-link.sell { color: var(--text-2); }
+@media (min-width: 1024px) {
+  .brand { width: 256px; justify-content: space-between; }
+  .hdr-link { width: 72px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .hdr-row { gap: 12px; height: 64px; }
+  .brand { padding: 4px; border-radius: var(--r-lg); }
+  .brand-cat { height: 36px; padding: 0 12px; font-size: 14px; }
+  .hdr-link { width: 40px; }
+}
+@media (max-width: 767px) {
+  .hdr-row { height: 56px; gap: 8px; }
+  .brand { padding: 4px 6px; border-radius: var(--r-md); }
+  .brand .logo { display: block; padding: 0; }
+  .brand .logo img { height: 28px; }
+  .brand-cat { display: none; }
+  .hdr-s-d { flex: 1; }
+  .hdr-search input { height: 40px; }
+  .hdr-search-go { top: 2px; }
+  .sp { position: fixed; left: 8px; right: 8px; top: 60px; max-height: calc(100vh - 140px); }
+}
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 26; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+.tabbar a, .tabbar button { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 56px; font-size: 11px; line-height: 14px; color: var(--text-2); }
+.tabbar .on { color: var(--brand); }
+.tabbar .badge-n { top: 4px; right: calc(50% - 22px); }
+@media (max-width: 767px) {
+  body.has-tab .sticky-bar { bottom: 57px; }
+  body.has-tab main, body.has-tab .ftr { }
+  body.has-tab .ftr-end { padding-bottom: 72px; }
+  body.has-tab.has-sticky .ftr-end { padding-bottom: 136px; }
+  .toast { bottom: calc(var(--sticky-h) + 72px); }
+}
+
+/* Подсказки поиска */
+.sp-c { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sp-c a:first-child { flex: 1; align-content: start; }
+.sp-c .btn { width: 100%; }
+.sp-c .btn.secondary:hover, .pc-add.secondary:hover { background: var(--surface-inverse); border-color: var(--surface-inverse); color: #fff; }
+
+/* Теги в одну строку */
+.clamp.one { max-height: 32px; }
+.clamp.one.open { max-height: none; }
+
+/* Карточка: цена и кнопка в одной строке */
+.pc-body { padding: 12px; gap: 8px; }
+.pc-buy { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
+.pc-price { padding: 0; margin: 0; font-size: 20px; line-height: 28px; font-weight: 700; white-space: nowrap; }
+.pc-add { flex: none; padding: 0 10px; }
+.pc-link { gap: 2px; }
+.pc-title { min-height: 0; margin-bottom: 2px; }
+.pc-sn { font-size: 12px; line-height: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-rate { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 16px; color: var(--text-3); }
+.pc-rate b { font-weight: 600; color: var(--text); }
+.pc-sub { margin-bottom: 2px; }
+.pc-body { container-type: inline-size; }
+.pc-btns { display: flex; align-items: center; gap: 4px; flex: none; }
+.pc-heart { flex: none; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: var(--r-md); color: var(--text-2); }
+.pc-heart:hover { background: var(--surface-subtle); color: var(--text); }
+.pc-heart.fav-on { color: var(--brand); }
+.pc-heart.fav-on svg { fill: var(--brand); }
+@container (max-width: 264px) {
+  .pc-buy { flex-direction: column; align-items: stretch; gap: 4px; }
+  .pc-btns { width: 100%; }
+  .pc-btns .pc-add { flex: 1; min-width: 0; }
+}
+@media (max-width: 639px) {
+  .pc-price { font-size: 18px; line-height: 24px; }
+  .pc-body { padding: 8px 10px 10px; }
+}
+.rel .pc-price { font-size: 16px; line-height: 24px; }
+.sticky-bar .icon-btn { flex: none; }
+.sticky-bar .sum { flex: none; }
+
+/* Главная */
+.band.first { padding-top: 24px; }
+.band.sun { background: var(--gold-100, #ffebc7); }
+.how { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 20px; counter-reset: none; }
+.how li { background: var(--surface); border-radius: var(--r-lg); padding: 20px; color: var(--text-2); }
+.how .num { width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 18px; line-height: 40px; text-align: center; margin-bottom: 12px; }
+.how-t { color: var(--text); font-size: 16px; line-height: 24px; }
+@media (min-width: 640px) { .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .how { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; } }
+.trust { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 20px; font-weight: 600; }
+.trust li { display: flex; align-items: center; gap: 8px; }
+.trust svg { color: var(--text); }
+.sell-row { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.sell-c { display: grid; gap: 12px; padding: 16px; }
+.sell-h { display: flex; gap: 12px; align-items: flex-start; }
+.sell-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.sell-items a { display: grid; gap: 2px; min-width: 0; }
+.sell-items img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-md); background: var(--surface-subtle); margin-bottom: 4px; }
+.sell-p { font-weight: 700; }
+.sell-t { font-size: 12px; line-height: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comm-l a { justify-content: flex-start; font-weight: 400; }
+.comm-l img { flex: none; width: 64px; height: 64px; border-radius: var(--r-md); object-fit: cover; background: var(--surface-subtle); }
+.comm-l a > span { display: grid; gap: 2px; min-width: 0; }
+.comm-l b { font-weight: 600; }
+.cta-card { display: grid; gap: 20px; align-items: center; background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--r-xl); padding: 24px; overflow: hidden; }
+.cta-t { display: grid; gap: 8px; justify-items: start; }
+.cta-t .btn { margin-top: 8px; }
+.cta-pics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cta-pics img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-lg); }
+@media (min-width: 768px) { .cta-card { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 32px; gap: 40px; } }
+
+/* Значки приложений как на сайте */
+.apps { gap: 12px; flex-wrap: wrap; }
+.apps a { display: flex; align-items: center; justify-content: center; width: 156px; height: 54px; }
+.apps img { width: 100%; height: 100%; object-fit: contain; }
+.apps a:first-child img { padding: 0 8px; }
+
+/* Каталог */
+.cat-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.cat-tabs { justify-self: start; }
+.cat-tabs button { padding: 0 12px; }
+.view-tg { margin-left: 0; }
+.cat-cats, .cat-flt { min-width: 0; }
+.cat-cats .dd-v { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 767px) { .cat-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cat-tabs { grid-column: 1 / -1; display: flex; } .cat-tabs button { flex: 1; } .view-tg { position: static; grid-column: 1 / -1; justify-self: end; } }
+@media (min-width: 768px) { .cat-bar { display: flex; flex-wrap: wrap; } }
+.flt-sort { display: grid; gap: 8px; padding-bottom: 12px; }
+.flt-ft { display: grid; gap: 8px; }
+.flt-ft2 { display: flex; justify-content: space-between; gap: 8px; }
+.flt-ft2 .btn { flex: 1; }
+
+/* Количество */
+.step-i { width: 40px; height: 100%; border: 0; background: none; text-align: center; font-weight: 600; outline: 0; padding: 0; }
+.step-i:focus { box-shadow: inset 0 -2px 0 var(--border-focus); }
+.step.sm .step-i { width: 32px; }
+
+/* Описание без болда */
+.spec dd, .d-h { font-weight: 400; color: var(--text); }
+.d-h { font-size: 14px; }
+
+/* Блок под кнопкой */
+.facts { gap: 0; }
+.facts li { padding: 12px 0; border-top: 1px solid var(--border-subtle); line-height: 20px; }
+.facts li:last-child { padding-bottom: 0; }
+.facts b { font-weight: 400; }
+
+/* Продавец */
+.seller-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.seller-stats > div:first-child { grid-column: auto; }
+.seller-hd .rate-row { font-size: 12px; line-height: 16px; }
+
+/* Отзывы */
+.rev-sum { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center; padding: 16px; }
+.rev-avg { display: grid; justify-items: center; gap: 2px; }
+.rev-avg .big { font-size: 32px; line-height: 40px; }
+.rev-bars { display: grid; gap: 4px; max-width: 360px; }
+.rev-b { display: grid; grid-template-columns: 10px 14px minmax(0, 1fr) 32px; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; }
+.rev-b i { height: 8px; border-radius: 4px; background: var(--surface-subtle); overflow: hidden; }
+.rev-b u { display: block; height: 100%; background: var(--gold); border-radius: 4px; text-decoration: none; }
+.rev-b span:last-child { text-align: right; }
+
+/* Обсуждение */
+.cm-list { display: grid; gap: 16px; margin-bottom: 16px; }
+.cm { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; }
+.ava.sm { width: 36px; height: 36px; font-size: 14px; }
+.cm p { margin-top: 2px; }
+.cm-form { display: grid; gap: 8px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+
+/* Подложки: на белом цветная заливка, на сером белая с рамкой */
+.card .note, .sum-card .note, .sg .note, .co-sec .note, .modal .note { border-color: transparent; }
+.card .note.info, .sum-card .note.info, .sg .note.info, .co-sec .note.info { background: var(--surface-info); }
+.card .note.ok, .sum-card .note.ok, .sg .note.ok, .co-sec .note.ok { background: var(--surface-success); }
+.card .note.warn, .sum-card .note.warn, .sg .note.warn, .co-sec .note.warn { background: var(--surface-warning); }
+.card .note.bad, .sum-card .note.bad, .sg .note.bad, .co-sec .note.bad { background: var(--surface-danger); }
+
+/* Кнопки-ссылки без подчёркивания */
+.linkbtn { text-decoration: none; }
+.linkbtn:hover { text-decoration: none; }
+.x-btn { flex: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--text-3); }
+.x-btn:hover { background: var(--surface-subtle); color: var(--text); }
+
+/* Оформление */
+.back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 8px; color: var(--text-2); font-weight: 600; }
+.back:hover { color: var(--text); }
+.pay-b { display: grid; gap: 12px; }
+.pay-b + .pay-b { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+.pay-b .lbl-b { margin: 0; }
+.pay-more { flex-wrap: wrap; gap: 8px 20px; }
+.sum-row .v.row { gap: 4px; }
+.co-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 0 0 16px; }
+.co-steps button { display: grid; justify-items: center; gap: 4px; width: 100%; font-size: 11px; line-height: 14px; color: var(--text-3); cursor: default; }
+.co-steps li.done button { cursor: pointer; color: var(--text); }
+.co-steps .n { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--surface-subtle); font-size: 12px; line-height: 16px; font-weight: 600; }
+.co-steps li.on button { color: var(--text); font-weight: 600; }
+.co-steps li.on .n { background: var(--brand); color: #fff; }
+.co-steps li.done .n { background: var(--surface-inverse); color: #fff; }
+@media (max-width: 1023px) {
+  .st { display: none; }
+  [data-step="1"] .st-1, [data-step="2"] .st-2, [data-step="3"] .st-3, [data-step="4"] .st-4 { display: block; }
+  [data-step="1"] .key.st-1, [data-step="1"] .guest-bar.st-1 { display: flex; }
+  .co-sec + .co-sec { margin-top: 0; }
+}
+
+/* Корзина на телефоне: цена и управление одной строкой под фото */
+@media (max-width: 767px) {
+  .ci-ctl { grid-column: 2 / -1; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; margin-top: 8px; }
+}
+
+/* Успех */
+.ok-page .sum-row { align-items: baseline; }
+.ok-page .sum-row > span:first-child { min-width: 0; }
+.ok-page .between { flex-wrap: wrap; gap: 4px 12px; }
+.ok-page .tag { white-space: nowrap; }
+
+/* Категории в фильтрах */
+.ct-list { display: grid; gap: 2px; }
+.ct { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border-radius: var(--r-sm); }
+.ct:hover { background: var(--surface-muted); }
+.ct.up { color: var(--text-2); padding-left: 0; }
+.ct.up svg { color: var(--text-3); }
+.ct.cur { background: var(--surface-muted); font-weight: 600; }
+.ct.kid { padding-left: 16px; }
+.ct-list .mm-more { padding: 4px 8px; }
+.cat-flt { justify-self: stretch; }
+@media (max-width: 767px) {
+  .cat-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .cat-tabs { grid-column: 1 / -1; }
+  .view-tg { grid-column: auto; }
+}
+
+.pc-sn { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* ===== Четвёртая партия правок ===== */
+/* Кнопки */
+.btn.incart { background: var(--surface-subtle); color: var(--text); }
+.btn.incart:hover { background: #e2e2e5; }
+.pc-add.primary:hover, .sp-c .btn.primary:hover { background: var(--surface-inverse); }
+.ftr { border-top: 1px solid var(--border-subtle); }
+
+/* Шапка на телефоне */
+.hdr-m1 { background: var(--surface); }
+.hdr-m1-row { display: flex; align-items: center; justify-content: space-between; height: 52px; }
+.hdr-m1 .hdr-act { margin: 0; }
+.hdr-m1 .hdr-link { width: 40px; height: 40px; }
+.hdr-m1 .hdr-link > span:not(.badge-n) { display: none; }
+.hdr-m1 .brand { padding: 4px 8px; }
+.hdr-m1 .logo { display: block; padding: 0; }
+.hdr-m1 .logo img { height: 28px; }
+@media (max-width: 767px) {
+  .hdr .brand { width: auto; padding: 0; background: none; }
+  .hdr .brand .logo { display: none; }
+  .hdr .brand-cat { display: inline-flex; height: 40px; padding: 0 12px; font-size: 14px; }
+  .hdr-row { height: 56px; }
+  .sp { position: absolute; left: 0; right: 0; top: 100%; }
+}
+
+/* Панель поиска на всю ширину, как каталог; тень только вниз */
+.sp, .mm { position: absolute; left: 0; right: 0; top: 100%; border-radius: 0; padding: 0; box-shadow: 0 16px 24px rgba(24, 24, 27, .16); clip-path: inset(0 -100vw -100vh -100vw); max-height: none; border-top: 1px solid var(--border-subtle); background: var(--surface); overflow: visible; }
+.sp-wrap { padding-top: 20px; padding-bottom: 24px; max-height: calc(100vh - 120px); overflow: auto; }
+.sp-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sp-c:nth-child(n) { display: flex; }
+@media (max-width: 639px) { .sp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sp-wrap { max-height: calc(100vh - 70px); padding-bottom: 32px; } }
+
+/* Преимущества */
+.adv { background: var(--surface); border-bottom: 1px solid var(--border-subtle); }
+.adv-in { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 40px; padding-top: 12px; padding-bottom: 12px; }
+.adv-i { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.adv-i > svg { color: var(--brand); }
+.adv-i > span { display: grid; min-width: 0; }
+.adv-i b { font-weight: 600; }
+.adv-i > span > span { font-size: 12px; line-height: 16px; color: var(--text-3); }
+@media (min-width: 768px) { .adv-in { display: flex; gap: 48px; } }
+@media (max-width: 479px) { .adv-in { grid-template-columns: minmax(0, 1fr); } }
+
+/* Как проходит покупка */
+.band.white .how li { background: var(--surface-muted); }
+
+/* Рекламный блок */
+.promo { position: relative; display: grid; align-items: center; background: var(--surface-inverse); color: #fff; border-radius: var(--r-xl); padding: 24px; overflow: hidden; min-height: 280px; }
+.promo-t { position: relative; z-index: 2; display: grid; gap: 8px; justify-items: start; max-width: 460px; }
+.promo-t p { color: #cfcfd4; font-size: 16px; line-height: 24px; }
+.promo-t .btn { margin-top: 8px; }
+.promo-f { position: relative; height: 240px; margin-top: 16px; }
+.promo-f img { position: absolute; bottom: -24px; object-fit: contain; height: auto; }
+.promo-f .f1 { width: 62%; left: 0; z-index: 1; }
+.promo-f .f2 { width: 50%; right: 0; z-index: 2; }
+@media (min-width: 768px) {
+  .promo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); padding: 40px 48px; min-height: 340px; }
+  .promo-f { height: 300px; margin: 0; }
+  .promo-f img { bottom: -60px; }
+  .promo-f .f1 { width: 56%; left: 0; }
+  .promo-f .f2 { width: 48%; right: 0; }
+}
+
+/* Карточка в выдаче */
+.pc-btns { justify-content: space-between; }
+.pc-sub { display: grid; font-size: 12px; line-height: 16px; }
+.pc-body { padding-bottom: 12px; }
+@container (max-width: 264px) {
+  .pc-add:not(.wide) span { display: none; }
+  .pc-btns .pc-add:not(.wide) { flex: none; width: 44px; padding: 0; }
+  .pc-btns .pc-add.wide { flex: 1; }
+}
+@container (min-width: 172px) and (max-width: 264px) {
+  .pc-buy { flex-direction: row; align-items: center; justify-content: space-between; }
+  .pc-btns { width: auto; }
+}
+@media (max-width: 639px) {
+  .pc-timer { top: auto; bottom: 8px; right: 8px; height: 28px; padding: 0 8px; font-size: 14px; line-height: 20px; }
+  .pc-dots { justify-content: flex-start; bottom: 16px; }
+  .grid.as-list .pc-timer { top: auto; bottom: 4px; right: 4px; }
+}
+
+/* Продавец: описание крупнее */
+.seller-hd .rate-row { font-size: 14px; line-height: 20px; }
+.seller-stats dt { font-size: 14px; line-height: 20px; }
+.seller-stats dd { font-size: 14px; line-height: 20px; }
+@media (max-width: 479px) { .seller-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Категории в фильтрах */
+.ct-g { padding: 8px 8px 2px 16px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--text-3); }
+.ct-sep { height: 1px; background: var(--border-subtle); margin: 6px 0; }
+.ct.kid.cur { background: var(--surface-muted); font-weight: 600; }
+
+/* Цена и количество в одной строке на телефоне */
+.buy-pr { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hide-m-cta:not(.has-step) { display: none; }
+@media (min-width: 1024px) { .hide-m-cta:not(.has-step) { display: block; } }
+
+/* Закреплённая панель */
+.sticky-bar { gap: 8px; }
+.sticky-bar .sum { margin-right: auto; }
+
+/* Оформление на телефоне */
+.addr-same { display: grid; gap: 4px; justify-items: start; }
+.pay-hd { display: flex; align-items: center; gap: 12px; }
+.pay-hd .so-items { flex: none; overflow: visible; gap: 4px; }
+.pay-hd .so-items img { width: 44px; height: 44px; border-radius: var(--r-sm); }
+@media (max-width: 1023px) {
+  body.has-sticky main { padding-bottom: 88px; }
+  .focus-page.page { padding-top: 12px; }
+  .focus-page .h1 { font-size: 24px; line-height: 32px; margin-bottom: 16px !important; }
+  .co-steps { margin-bottom: 20px; }
+  .co-sec { padding: 16px; }
+  .co-hd { margin-bottom: 12px; }
+  .co-sub { margin: -4px 0 16px; }
+  .form-grid { gap: 16px; }
+  .guest-bar { margin-bottom: 16px; padding: 12px 16px; gap: 8px; }
+  .focus-page .key { margin-bottom: 16px; }
+  .seller-order { border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; margin-top: 16px; padding-top: 4px; }
+  .seller-order.err { border-top-color: var(--border-danger); }
+  .so-hd { padding: 12px 0; border: 0; }
+  .so-bd { padding: 0; gap: 20px; }
+  .opt { padding: 12px; }
+  .lbl-b { margin-bottom: 8px; }
+  .addr-grid { gap: 12px; }
+}
+
+@media (max-width: 639px) { .sec-t { font-size: 20px; line-height: 28px; } }
+
+/* ===== Пятая партия правок ===== */
+/* 14. Информеры: цветной фон и рамка везде */
+.note.info, .card .note.info, .sum-card .note.info, .sg .note.info, .co-sec .note.info { background: var(--surface-info); border-color: #2f80ed; }
+.note.ok, .card .note.ok, .sum-card .note.ok, .sg .note.ok, .co-sec .note.ok { background: var(--surface-success); border-color: var(--green); }
+.note.warn, .card .note.warn, .sum-card .note.warn, .sg .note.warn, .co-sec .note.warn { background: var(--surface-warning); border-color: var(--gold); }
+.note.bad, .card .note.bad, .sum-card .note.bad, .sg .note.bad, .co-sec .note.bad { background: var(--surface-danger); border-color: var(--border-danger); }
+
+/* 4. Каталог в шапке */
+.cat-ic { display: none; }
+.cat-t, .cat-ch { display: inline-flex; }
+@media (max-width: 767px) {
+  .cat-ic { display: inline-flex; }
+  .cat-t, .cat-ch { display: none; }
+  .hdr .brand-cat { width: 40px; padding: 0; justify-content: center; }
+}
+
+/* 5. Крошки */
+@media (max-width: 767px) {
+  .cr-mid + .cr-sep { display: inline-flex; }
+  .crumbs.open { flex-wrap: wrap; white-space: normal; overflow: visible; }
+  .crumbs.open .cr-mid { display: contents; }
+  .crumbs.open > a, .crumbs.open > span { overflow: visible; }
+}
+
+/* 6. Подсказки и действия с продавцом */
+.tip { position: relative; }
+.tip::after { content: attr(data-tip); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 4px 8px; border-radius: var(--r-sm); background: var(--surface-inverse); color: #fff; font-size: 12px; line-height: 16px; font-weight: 400; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 6; }
+.tip:hover::after, .tip:focus-visible::after { opacity: 1; }
+.tip.down::after { bottom: auto; top: calc(100% + 6px); left: 0; transform: none; }
+.seller-act { display: flex; gap: 8px; flex-wrap: nowrap; }
+.seller-act .s-sub { flex: 1; }
+.seller-act .s-i { flex: none; width: 32px; height: 32px; }
+@media (min-width: 768px) { .seller-act .s-sub::after { display: none; } }
+@media (max-width: 767px) {
+  .seller-act .s-sub { flex: none; width: 40px; height: 40px; padding: 0; }
+  .seller-act .s-sub span { display: none; }
+  .seller-act .s-i { width: 40px; height: 40px; }
+  .seller-act .s-sub.tip::after { left: 0; transform: none; }
+}
+
+/* 7. Жалоба */
+.d-foot .linkbtn { color: var(--text-danger) !important; }
+
+/* 8. Подскролл под закреплённую шапку */
+.tabs { scroll-margin-top: 72px; }
+@media (min-width: 1024px) { .tabs { scroll-margin-top: 100px; } }
+
+/* 10. Звёзды в отзыве */
+.rev-st { display: flex; gap: 2px; margin: 2px 0 4px; }
+.rev-st span svg { color: var(--surface-subtle); }
+.rev-st span.on svg { color: var(--gold); }
+
+/* 11. Чипы выбранных фильтров */
+.chip.af { padding: 0; gap: 0; }
+.chip.af > button { display: inline-flex; align-items: center; height: 100%; padding: 0 4px 0 12px; font-weight: 400; color: var(--text-2); }
+.chip.af .af-x { padding: 0 8px 0 4px; }
+
+/* 12. Таймер на месте метки */
+.pc-timer, .grid.as-list .pc-timer { left: 8px; right: auto; top: 8px; bottom: auto; gap: 6px; display: inline-flex; align-items: center; height: 32px; padding: 0 10px 0 8px; font-size: 16px; line-height: 24px; }
+.pc-timer .tip { display: inline-flex; }
+.pc-media { overflow: visible; }
+.pc-img { overflow: hidden; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.pc-dots { justify-content: center; bottom: 8px; }
+@media (max-width: 639px) { .pc-timer, .grid.as-list .pc-timer { height: 28px; padding: 0 8px 0 6px; font-size: 14px; line-height: 20px; } }
+.grid.as-list .pc-img { border-radius: var(--r-lg) 0 0 var(--r-lg); }
+
+/* 16. Подпись ставки */
+.lab-short { display: none; }
+@container (max-width: 264px) { .lab-long { display: none; } .lab-short { display: inline; } }
+
+/* 3, 25. Кнопка и количество в карточке */
+.pc-btns .step.pc-step { flex: none; height: 32px; }
+.pc-step button { width: 28px; }
+.pc-step .step-i { width: 28px; }
+@container (max-width: 264px) {
+  .pc-btns .pc-add:not(.wide) { flex: 1; width: auto; min-width: 56px; }
+  .pc-btns .step.pc-step { flex: 1; justify-content: space-between; }
+}
+@container (min-width: 172px) and (max-width: 264px) {
+  .pc-btns .pc-add:not(.wide) { flex: none; width: 56px; }
+  .pc-btns .step.pc-step { flex: none; }
+}
+
+/* 21. Удаление в корзине */
+.ci-ctl .icon-btn { color: var(--brand); }
+
+/* 23, 24. Плашки */
+.pc-badges { position: absolute; left: 8px; bottom: 24px; display: grid; gap: 4px; justify-items: start; pointer-events: none; }
+.pc-badges span, .buy-badges span { display: inline-block; padding: 2px 8px; border-radius: var(--r-sm); font-size: 12px; line-height: 16px; font-weight: 600; background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+.buy-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* 26. Преимущества */
+.adv-in { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 24px; }
+@media (max-width: 1023px) { .adv-in { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 479px) { .adv-i b { font-size: 13px; line-height: 18px; } .adv-i { gap: 8px; align-items: flex-start; } }
+
+/* 27. Значки в покупке */
+.how .num { display: flex; align-items: center; justify-content: center; }
+
+/* 29. Подсказки поиска */
+.sp-t { margin-bottom: 12px; }
+.sp-pr { font-size: 18px; line-height: 24px; font-weight: 700; margin-top: 4px; }
+
+/* 31. Переключатель */
+.tabs-seg { background: var(--surface); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.tabs-seg button.on { background: var(--surface-inverse); color: #fff; }
+
+/* 15. Телеграм */
+.tg-banner { display: grid; justify-items: start; gap: 8px; padding: 20px; border-radius: var(--r-lg); background: linear-gradient(135deg, #e3f2fd, #cfe8fb); }
+.tg-banner p { color: var(--text-2); }
+.tg-banner .btn { margin-top: 8px; }
+.tg-banner img { margin-bottom: 4px; }
+
+/* 19. Обсуждение деревом */
+.cm-list { gap: 20px; }
+.cm-thread { display: grid; gap: 12px; }
+.cm-replies { display: grid; gap: 12px; margin-left: 17px; padding-left: 19px; border-left: 2px solid var(--border); }
+.cm .row { flex-wrap: wrap; }
+.cm-form.in { padding: 0; border: 0; }
+
+/* 1, 2. Фильтры */
+.ct.root { padding-left: 8px; }
+.ct.more { justify-content: space-between; }
+.ct.more svg { color: var(--text-3); }
+.flt-sort { display: none; }
+
+/* Логотип без подложки, чёрный; кнопка каталога красная */
+.brand, .hdr-m1 .brand { background: none; padding: 0; border-radius: 0; }
+.brand .logo { padding: 0; }
+.brand .logo img { filter: none; }
+.hdr-m1 .brand { padding: 0; }
+@media (min-width: 1024px) { .brand .logo img { height: 44px; } }
+.seller-act .s-i:last-child.tip::after { left: auto; right: 0; transform: none; }
+
+/* Применённый фильтр: название красным */
+.flt-t.on { color: var(--brand); }
+.flt-t.on svg { color: var(--brand); }
+.ct.root { padding-left: 16px; }
+
+/* ===== Шестая партия правок ===== */
+/* 2, 8. Преимущества равномерно */
+.adv-in { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 767px) { .adv-in { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 3. Покупка наверху, компактно */
+.how-top { background: var(--surface); padding: 16px 0 20px; border-bottom: 1px solid var(--border-subtle); }
+.how-top .sec-t { font-size: 18px; line-height: 24px; font-weight: 600; }
+.how-top .how { margin-top: 8px; gap: 8px; }
+.how-top .how li { display: flex; gap: 10px; padding: 10px 12px; font-size: 12px; line-height: 16px; }
+.how-top .num { flex: none; width: 32px; height: 32px; margin: 0; }
+.how-top .how-t { font-size: 14px; line-height: 20px; margin-bottom: 2px; }
+.band.white .how li { background: var(--surface-muted); }
+.how li > div { min-width: 0; }
+@media (max-width: 1023px) { .how-top .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 4. Единый ховер красных кнопок */
+.btn.primary:hover, .pc-add.primary:hover, .sp-c .btn.primary:hover { background: var(--brand-hover); }
+.btn.primary:active, .pc-add.primary:active { background: var(--brand-pressed); }
+
+/* 12. Второстепенные кнопки: серая заливка без рамки */
+.btn.secondary { background: #e2e2e5; border-color: transparent; color: var(--text); }
+.btn.secondary:hover { background: #cfcfd4; }
+.btn.secondary:active { background: #a9a9b0; }
+.icon-btn.line { background: #e2e2e5; border-color: transparent; color: var(--text); }
+.icon-btn.line:hover { background: #cfcfd4; }
+.icon-btn.line:active { background: #a9a9b0; }
+.icon-btn.line.fav-on { color: var(--brand); }
+
+/* 5. Другие товары продавца */
+.rel-list { display: flex; gap: 12px; overflow-x: auto; padding: 0 16px 12px; scrollbar-width: none; }
+.rel-list::-webkit-scrollbar { display: none; }
+.rl { flex: none; width: 112px; display: grid; gap: 2px; }
+.rl img { width: 112px; height: 112px; object-fit: cover; border-radius: var(--r-md); background: var(--surface-subtle); margin-bottom: 4px; }
+.rl-p { font-weight: 700; }
+.rl-t { font-size: 12px; line-height: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 6. Телеграм в блоке шагов */
+.tg-box { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 24px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.tg-box > div { flex: 1; min-width: 200px; }
+.tg-box img { flex: none; }
+
+/* 7. Экран успеха */
+.ok-hd { display: block; padding-top: 16px; margin-bottom: 8px; }
+.ok-ic { width: 56px; height: 56px; margin-bottom: 12px; background: var(--green); color: #fff; }
+.ok-ic svg { stroke-width: 2.5; }
+
+/* 10. Выбранные фильтры */
+.chip.af > button { color: var(--text); }
+
+/* 11. Продавец */
+.seller-stats { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.seller-stats > div { display: flex; justify-content: space-between; gap: 12px; }
+.seller-stats dd { text-align: right; }
+.seller-act .s-sub::after { display: none; }
+.seller-act .s-sub { flex: 2; width: auto; padding: 0 8px; }
+.seller-act .s-sub span { display: inline; }
+.seller-act .s-i { flex: 1; width: auto; }
+@media (max-width: 767px) { .seller-act .s-sub, .seller-act .s-i { height: 40px; } }
+.seller-act .btn, .seller-act .icon-btn { height: 36px; }
+
+/* 14. Шаг оплаты */
+@media (max-width: 1023px) { [data-step="3"] .key.st-3 { display: flex; } }
+
+/* 15. Промокод и комментарий */
+.pay-more { gap: 16px 24px; }
+
+/* ===== Седьмая партия правок ===== */
+/* 1. Блоки на проверке ближе друг к другу */
+.focus-page .sum-card .key { margin-bottom: 0; }
+.sum-card .key + .key { margin-top: -4px; }
+
+/* 2. Шильдик статуса */
+.tag.warn { background: #ffe2ad; color: #a85600; box-shadow: none; }
+
+/* 3. Язык и валюта в меню */
+.drawer-hd { position: relative; z-index: 2; }
+.drawer-hd .dd { flex: none; }
+.drawer-hd .dd.plain .dd-btn { height: 32px; padding: 0 2px; gap: 0; font-size: 12px; line-height: 16px; }
+.drawer-hd .dd-menu { left: auto; right: 0; min-width: 88px; }
+
+/* 4. Переключатель на всю ширину */
+@media (max-width: 767px) { .cat-tabs { justify-self: stretch; width: 100%; } }
+
+/* Ссылки верхней строки: тот же ховер, что у RUS и RUB */
+.hdr-top-nav { gap: 8px; margin-left: -8px; }
+.hdr-top-nav a { display: inline-flex; align-items: center; height: 32px; padding: 0 8px; border-radius: var(--r-md); }
+.hdr-top-nav a:hover { background: var(--surface-muted); color: var(--text); }
+
+/* Текстовые кнопки: без подчёркивания, ховер как в шапке */
+.row-l, .clamp-btn, .act-f .linkbtn { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; border-radius: var(--r-md); color: var(--text-2); font-weight: 400; text-decoration: none; }
+.row-l:hover, .clamp-btn:hover, .act-f .linkbtn:hover { background: rgba(24, 24, 27, .05); color: var(--text); text-decoration: none; }
+.row-l { margin-right: -8px; }
+.clamp-btn { margin: 4px 0 0 -8px; }
+
+/* Значки приложений в одну строку на ширине больше 768 */
+@media (min-width: 769px) {
+  .apps { flex-wrap: nowrap; }
+  .apps a { flex: 1 1 0; min-width: 0; width: auto; height: 44px; }
+  .apps a:first-child img { padding: 0; }
+}
+
+/* Количество в подсказках поиска */
+.sp-c .step { width: 100%; justify-content: space-between; flex: none; }
+.sp-c .step .step-i { flex: 1; min-width: 0; }
+
+/* Блок продавца: акценты кнопок, отступ и разделители */
+.seller-act .s-sub, .seller-act .s-cat { background: var(--surface-inverse); border-color: transparent; color: #fff; }
+.seller-act .s-sub:hover, .seller-act .s-cat:hover { background: #45454b; }
+.seller-act .s-sub:active, .seller-act .s-cat:active { background: #5c5c63; }
+.seller-act .s-block { background: none; border-color: transparent; color: var(--brand); }
+.seller-act .s-block:hover { background: var(--surface-danger); }
+.seller-act .s-block:active { background: #ffe1e1; }
+.seller-hd .rate-row { margin-top: 4px; }
+.seller-stats { gap: 0; padding-top: 0; }
+.seller-stats > div { padding: 8px 0; border-top: 1px solid var(--border-subtle); }
+.seller-stats > div:first-child { border-top: 0; }
+
+/* Оплата: отступ от способа оплаты, оставшаяся кнопка всегда внизу */
+.pay-b > .opt-list + * { margin-top: 8px; }
+
+/* Плашка гостя на белом фоне */
+.guest-bar { background: var(--surface); border: 1px solid var(--border-subtle); }
+
+/* Главная: единая шкала отступов. Между блоками 48/32, заголовок и контент 20/16, внутри карточек 16 */
+.band, .band.first { padding: 32px 0; }
+.band .sec-hd { align-items: center; min-height: 32px; margin-bottom: 16px; }
+.band .sec-t + .how { margin-top: 16px; }
+.band .scroller { padding-bottom: 0; }
+.band .center { margin-top: 16px; }
+.how li, .sell-c { padding: 16px; }
+.comm-l li:first-child a { padding-top: 0; }
+.comm-l li:last-child a { padding-bottom: 0; }
+.adv-in { padding-top: 12px; padding-bottom: 12px; }
+@media (min-width: 1024px) {
+  .band, .band.first { padding: 48px 0; }
+  .band .sec-hd { margin-bottom: 20px; }
+  .band .sec-t + .how { margin-top: 20px; }
+  .band .center { margin-top: 20px; }
+  .how { gap: 16px; }
+  .sell-row, .tiles, .band .scroller, .band .grid { gap: 16px; }
+}
+
+/* Переключатели без рамки */
+.tabs-seg { box-shadow: none; }
+
+/* Преимущества на телефоне строками */
+@media (max-width: 767px) {
+  .adv-in { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .adv-i { align-items: center; gap: 12px; }
+  .adv-i b { font-size: 14px; line-height: 20px; }
+}
+
+/* Продавцы на телефоне: две карточки */
+@media (max-width: 639px) { .sell-c:nth-child(n+3) { display: none; } }
+
+/* Отступы между селектами и крестиком в меню */
+.drawer-hd { gap: 12px; }
+
+/* Преимущества на телефоне: больше воздуха */
+@media (max-width: 767px) {
+  .adv-in { gap: 16px; padding-top: 16px; padding-bottom: 16px; }
+}
+
+/* Переключатель с прокруткой на телефоне: доходит до края экрана */
+@media (max-width: 767px) {
+  .tabs-seg.scroll-x { flex: 0 0 calc(100% + var(--gutter)); width: calc(100% + var(--gutter)); max-width: none; margin-right: calc(var(--gutter) * -1); border-radius: var(--r-md) 0 0 var(--r-md); padding-right: var(--gutter); scrollbar-width: none; }
+  .tabs-seg.scroll-x::-webkit-scrollbar { display: none; }
+  .tabs-seg.scroll-x button { flex: none; }
+}
+
+/* Каталог на телефоне: вид рядом с вкладками, белая кнопка фильтров */
+.btn.cat-flt { background: var(--surface); color: var(--text); }
+.btn.cat-flt:hover { background: var(--surface-subtle); }
+.af-filter { position: relative; flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-full); background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.af-filter:hover { background: var(--surface-subtle); }
+.af-filter .badge-n { top: -6px; right: -6px; min-width: 16px; height: 16px; line-height: 16px; font-size: 11px; padding: 0 3px; }
+@media (max-width: 767px) {
+  .cat-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .cat-tabs { grid-column: 1; width: auto; }
+  .view-tg { grid-column: 2; grid-row: 1; justify-self: end; }
+  .cat-flt { grid-column: 1 / -1; }
+}
+
+.cat-count { flex: none; white-space: nowrap; }
+
+/* Действия с продавцом: значок и мелкая подпись, как в шапке */
+.seller-act { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.seller-l { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 2px; border-radius: var(--r-md); font-size: 12px; line-height: 16px; color: var(--text-2); }
+.seller-l:hover { background: var(--surface-muted); color: var(--text); }
+.seller-l:active { background: var(--surface-subtle); }
+
+/* Главная: больше воздуха, ритм свободнее */
+.band, .band.first { padding: 48px 0; }
+.band .sec-hd { margin-bottom: 20px; }
+.band .sec-t + .how { margin-top: 20px; }
+.band .center { margin-top: 24px; }
+.band:has(.how) { padding: 56px 0; }
+.band:has(.promo) { padding: 56px 0; }
+@media (min-width: 768px) {
+  .band, .band.first { padding: 64px 0; }
+  .band:has(.how), .band:has(.promo) { padding: 80px 0; }
+}
+@media (min-width: 1024px) {
+  .band, .band.first { padding: 80px 0; }
+  .band.first { padding-top: 56px; }
+  .band:has(.how), .band:has(.promo) { padding: 96px 0; }
+  .band .sec-hd { margin-bottom: 24px; }
+  .band .sec-t + .how { margin-top: 24px; }
+  .band .center { margin-top: 32px; }
+}
+
+/* Блок продавца: снизу до кнопок на 8 меньше */
+.seller-act { margin-bottom: -8px; }
+
+/* Серые кнопки светлее */
+.btn.secondary, .icon-btn.line { background: var(--surface-subtle); }
+.btn.secondary:hover, .icon-btn.line:hover { background: #e2e2e5; }
+.btn.secondary:active, .icon-btn.line:active { background: #cfcfd4; }
+/* На сером фоне такая кнопка сливается, поэтому белая */
+.band .center .btn.secondary { background: var(--surface); }
+.band .center .btn.secondary:hover { background: var(--surface-subtle); }
+.band .center .btn.secondary:active { background: #e2e2e5; }
+
+/* Экран успеха: анимация один раз при открытии заказа */
+.ok-ic { position: relative; isolation: isolate; background: none; }
+.ok-ic svg { display: block; overflow: visible; stroke-width: 0; }
+.ok-c { fill: #2eb26b; }
+.ok-k { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.ok-ic.play .ok-c { transform-box: fill-box; transform-origin: center; animation: ok-pop .45s cubic-bezier(.34, 1.56, .64, 1) both; }
+.ok-ic.play .ok-k { stroke-dashoffset: 1; animation: ok-draw .35s ease-out .25s forwards; }
+.ok-ic.play::after { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: 50%; background: #2eb26b; opacity: 0; animation: ok-ring .8s ease-out .2s; }
+@keyframes ok-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes ok-draw { to { stroke-dashoffset: 0; } }
+@keyframes ok-ring { from { opacity: .35; transform: scale(1); } to { opacity: 0; transform: scale(1.7); } }
+@media (prefers-reduced-motion: reduce) {
+  .ok-ic.play .ok-c, .ok-ic.play .ok-k, .ok-ic.play::after { animation: none; }
+  .ok-ic.play .ok-k { stroke-dashoffset: 0; }
+}
+
+/* Экран успеха: значок и заголовок в одну строку слева */
+.ok-hd { display: flex; align-items: center; gap: 12px; }
+.ok-ic { width: 40px; height: 40px; margin: 0; }
+.ok-ic svg { width: 100%; height: 100%; }
+@media (max-width: 767px) {
+  .ok-hd { gap: 8px; }
+  .ok-ic { width: 32px; height: 32px; }
+  .ok-page .ok-hd .h1 { font-size: 20px; line-height: 28px; }
+}
+
+/* Карточка заказа: строки с дивайдерами */
+.oc-rows .sum-row { padding: 8px 0; border-top: 1px solid var(--border-subtle); }
+.oc-rows .sum-row:last-child { padding-bottom: 0; }
+
+/* Блоки под друг другом: значения продавца и характеристик на одной линии */
+@media (max-width: 1023px) {
+  .seller-stats > div { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 16px; }
+  .seller-stats dd { text-align: left; }
+}
+@media (max-width: 639px) {
+  .seller-stats > div, .spec > div { grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 8px; }
+}
+
+/* Второй ряд объявлений на том же сером фоне: без двойного отступа */
+.band.band-next { padding-top: 0; }
+
+/* Сводка отзывов без подложки */
+.rev-sum { padding: 0; margin-bottom: 12px; background: none; border-radius: 0; }

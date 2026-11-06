@@ -47,7 +47,14 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 .ann .ref { display: block; margin-top: 2px; color: var(--t3); font-size: 12px; line-height: 16px; }
 .ann li.dev { border-left: 2px solid #eeb250; }
 .ann li.dev::before { content: 'Для разработки'; display: block; color: #eeb250; font-size: 11px; line-height: 16px; font-weight: 600; }
-@media (max-width: 900px) { .bar { flex-wrap: wrap; } .steps { order: 3; flex-basis: 100%; } .main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); } .side { display: none; } }
+.side-x { display: none; margin-bottom: 8px; }
+@media (max-width: 900px) { .bar { flex-wrap: wrap; } .steps { order: 3; flex-basis: 100%; } .main { grid-template-rows: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; }
+  body.side-open .side { display: block; position: fixed; top: 0; right: 0; bottom: 0; width: min(320px, 100%); z-index: 30; }
+  .side-x { display: block; }
+}
 </style>
 </head>
 <body>
@@ -56,11 +63,11 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
   <div class="steps" id="steps"></div>
   <div class="seg" id="widths" aria-label="Ширина экрана"></div>
   <button class="lnk" id="sideBtn">Панель</button>
-  <a class="lnk" href="app.html?v=59" target="_blank">Без панели</a>
+  <a class="lnk" href="app.html?v=77" target="_blank">Без панели</a>
 </div>
 <div class="main">
   <div class="stage" id="stage">
-    <div class="frame-box" id="box"><iframe id="f" src="app.html?v=59#/" title="Прототип"></iframe></div>
+    <div class="frame-box" id="box"><iframe id="f" src="app.html?v=77#/" title="Прототип"></iframe></div>
     <span class="scale" id="scale" hidden></span>
   </div>
   <aside class="side" id="side"></aside>
@@ -90,8 +97,8 @@ const NOTES = {
     ['Фильтры применяются сразу', 'Убрали кнопку «Показать» на десктопе и показываем выбранное чипами над выдачей, чтобы сразу видеть результат и снимать фильтры по одному', 'UX'],
     ['Кнопка вместо значка', 'Заменили маленький значок корзины на красную кнопку рядом с ценой, чтобы главное действие было заметно в выдаче', 'UX. RICE 7'],
     ['Количество в карточке', 'Показываем счётчик вместо кнопки после добавления, чтобы менять количество, не уходя из выдачи', 'UX'],
-    ['Продавец на карточке', 'Добавили продавца, город и рейтинг, чтобы оценить продавца без перехода в объявление', 'CJM 1, этап 3. RICE 2'],
-    ['Плашки на фото', 'Вывели «Бесплатная доставка» и «Безопасная сделка» на карточку, чтобы условия были видны ещё до открытия объявления', 'Продуктовый опыт'],
+    ['Адаптив: фото крупнее, текста меньше', 'Убрали поля и зазоры почти до нуля, сделали фото выше, убрали город, а кнопку поставили вниз, чтобы фото работало на выбор и на экране помещалось больше товаров', 'UX'],
+    ['Продавец на карточке', 'Добавили продавца, город, рейтинг и число отзывов со значком, чтобы оценить продавца без перехода в объявление', 'CJM 1, этап 3. RICE 2'],
     ['Телефон: шторка фильтров', 'Собрали категории, фильтры и сортировку в шторку с кнопкой «Показать N», чтобы выдача начиналась сразу под шапкой', 'CJM 1, этап 1. RICE 6'],
     ['Телефон: один фильтр', 'Открываем шторку только нужного фильтра по нажатию на чип, чтобы поправить его, не пролистывая все', 'UX'],
     ['Телефон: вид выдачи', 'Добавили переключатель на одну или две карточки в ряд, чтобы выбирать между фото крупнее и большим числом товаров', 'UX'],
@@ -101,7 +108,7 @@ const NOTES = {
     ['Кнопка рядом с ценой', 'Поставили цену, избранное и кнопку покупки в один ряд, а после добавления показываем количество, чтобы действие не терялось среди равнозначных кнопок', 'Flow 1. RICE 7'],
     ['Панель покупки на телефоне', 'Закрепили цену и кнопку внизу экрана, чтобы не листать до них почти 1000 px', 'Flow 2. CJM 1, этап 2. RICE 4'],
     ['Рейтинг на виду', 'Вывели оценку и число отзывов в блок продавца, чтобы доверие появлялось до открытия вкладок', 'Flow 1. CJM 1, этап 3. RICE 2'],
-    ['Отзывы отдельной вкладкой', 'Сделали вкладку с разбивкой по звёздам и сортировкой, чтобы быстро понять, почему у продавца такая оценка', 'CJM 1, этап 3. RICE 2'],
+    ['Отзывы о товаре и о продавце раздельно', 'Оставили рядом с обсуждением отзывы именно об этом лоте, а отзывы о продавце открываем отдельно по ссылке у рейтинга, чтобы покупатель видел, что пишут о товаре, и при желании проверял продавца', 'CJM 1, этап 3. RICE 2'],
     ['Блок продавца на всех ширинах', 'Вывели блок из свёрнутой секции на 768 и 360, чтобы покупатель с телефона видел продавца без лишних нажатий', 'Находки сайта'],
     ['Действия с продавцом значками', 'Сжали подписку, все товары и блокировку до значков с подписью, чтобы они не спорили с кнопкой покупки', 'Flow 1'],
     ['Описание по блокам', 'Разделили характеристики и текст, добавили абзацы и «Показать полностью», чтобы длинное описание читалось и не отодвигало отзывы', 'UX'],
@@ -152,7 +159,7 @@ const NOTES = {
 
 const HINTS = {
   catalog: ['Работают цена, город, оригинальность, состояние, материал, комплектация, категории и поиск. «Продавец» и «Безопасность» только запоминаются: таких данных у лотов нет', 'Лотов 19, поэтому «по 48» и «по 96» выдачу не меняют'],
-  item: ['Включите «Вошедший пользователь» в состояниях, чтобы увидеть форму обсуждения'],
+  item: ['Включите «Вошедший пользователь» в состояниях, чтобы увидеть форму обсуждения', 'Отзывы о товаре и теги примерные: отзывы взяты из отзывов о продавце, теги подобраны вручную'],
   checkout: ['Промокод MINI10, сертификат GIFT500. Любой другой покажет ошибку'],
   success: ['Варианты «Email есть в базе» и «Автоподтверждение у PRO» переключаются выше'],
 };
@@ -198,7 +205,7 @@ function drawSide() {
     if (x.t === 'select') return `<label>${x.l}<select class="sel" data-sel="${x.k}" style="margin-top:4px">${x.o.map(([v, t]) => `<option value="${v}" ${st.flags[x.k] === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`;
     return '';
   }).join('');
-  $('#side').innerHTML = `${ctl ? `<h2>Состояния</h2><div class="ctl">${ctl}</div>` : ''}
+  $('#side').innerHTML = `<button class="lnk side-x" id="sideClose">Скрыть панель</button>${ctl ? `<h2>Состояния</h2><div class="ctl">${ctl}</div>` : ''}
     <h2>Что изменили и почему</h2>
     <ul class="ann">${n.map(([a, b, r, dev]) => `<li class="${dev ? 'dev' : ''}"><b>${nb(a)}</b>${nb(b)}${r ? `<span class="ref">${r}</span>` : ''}</li>`).join('')}</ul>
     ${hints.length ? `<h2>Как проверить</h2><ul class="ann">${hints.map((t) => `<li>${nb(t)}</li>`).join('')}</ul>` : ''}
@@ -217,7 +224,8 @@ document.addEventListener('click', (e) => {
   if ('fill' in t.dataset) send({ type: 'mfm-fill' });
   if ('empty' in t.dataset) send({ type: 'mfm-empty-submit' });
   if ('reset' in t.dataset) send({ type: 'mfm-reset' });
-  if (t.id === 'sideBtn') { document.body.classList.toggle('no-side'); layout(); }
+  if (t.id === 'sideBtn') { document.body.classList.toggle(window.innerWidth <= 640 ? 'side-open' : 'no-side'); layout(); }
+  if (t.id === 'sideClose') document.body.classList.remove('side-open');
 });
 document.addEventListener('change', (e) => {
   const t = e.target;

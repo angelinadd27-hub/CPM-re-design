@@ -450,8 +450,7 @@
 .ci-ctl .icon-btn { color: var(--brand); }
 
 /* 23, 24. Плашки */
-.pc-badges { position: absolute; left: 8px; bottom: 24px; display: grid; gap: 4px; justify-items: start; pointer-events: none; }
-.pc-badges span, .buy-badges span { display: inline-block; padding: 2px 8px; border-radius: var(--r-sm); font-size: 12px; line-height: 16px; font-weight: 600; background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
+.buy-badges span { display: inline-block; padding: 2px 8px; border-radius: var(--r-sm); font-size: 12px; line-height: 16px; font-weight: 600; background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--border); }
 .buy-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 
 /* 26. Преимущества */
@@ -773,3 +772,64 @@
 
 /* Индикатор избранного в шапке серый */
 .hdr-link[aria-label="Избранное"] .badge-n { background: var(--surface-subtle); color: var(--text); box-shadow: 0 0 0 1px var(--surface); }
+
+/* Правки 6 ноября */
+/* Шильдик PRO зелёный */
+.tag.pro { background: #96c651; color: #fff; }
+
+/* Значок поиска слева */
+.hdr-search input { padding: 0 12px 0 44px; }
+.hdr-search-go { left: 4px; right: auto; }
+
+/* Число отзывов со значком в карточках */
+.pc-rev { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.pc-rev .i { fill: var(--text-3); stroke: none; }
+.pc-rev span { font-weight: 600; color: var(--text); }
+
+/* Теги над характеристиками */
+.d-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+/* Страница отзывов о продавце */
+.rev-who { gap: 8px; margin: 8px 0 16px; }
+
+/* «Показать ещё» в блоке на сером фоне */
+.sec-more { margin-top: 16px; text-align: center; }
+.sec-more .btn.secondary { background: var(--surface); }
+.sec-more .btn.secondary:hover { background: var(--surface-subtle); }
+.sec-more .btn.secondary:active { background: #e2e2e5; }
+
+/* Адаптив: карточка как на маркетплейсах. Минимальные поля и зазоры, высокое фото, меньше текста */
+@media (max-width: 1023px) {
+  .grid { gap: 4px; margin-left: calc(4px - var(--gutter)); margin-right: calc(4px - var(--gutter)); }
+  .scroller { gap: 4px; padding-left: 4px; padding-right: 4px; scroll-padding-left: 4px; }
+  .pc-img { aspect-ratio: 3 / 4; }
+  .pc-body { padding: 8px 6px 6px; gap: 2px; }
+  .pc-buy { display: contents; }
+  .pc-price { order: 1; font-size: 16px; line-height: 20px; }
+  .pc-link { order: 2; flex: 1; gap: 0; }
+  .pc-title { margin-bottom: 2px; font-size: 14px; line-height: 18px; font-weight: 400; }
+  .pc-sub { margin-bottom: 0; }
+  .pc-btns { order: 3; width: 100%; margin-top: 6px; justify-content: space-between; }
+  .pc-btns .pc-add:not(.wide), .pc-btns .pc-add.wide { flex: 1; width: auto; min-width: 0; }
+  .pc-btns .step.pc-step { flex: 1; justify-content: space-between; }
+  .pc-city { display: none; }
+}
+@media (max-width: 639px) {
+  .scroller { grid-auto-columns: 46%; }
+  /* Одна или две карточки занимают всю ширину, как в каталоге */
+  .scroller:not(:has(> :nth-child(3))) { grid-auto-columns: calc(50% - 2px); }
+}
+/* Аукционы на телефоне: карточка в две обычные, фото квадратное, чтобы она помещалась на экране */
+@media (max-width: 639px) {
+  .band.first .scroller { grid-auto-columns: calc(92% + 4px); }
+  .band.first .pc-img { aspect-ratio: 1; }
+}
+
+/* Телефон: блоки с фоном ближе к краю, 4 px. Текст, меню и закреплённые панели на обычных полях */
+@media (max-width: 639px) {
+  main .card, main .sg, main .sum-card, main .co-sec, main .guest-bar, main .cat-bar, main .how, main .sell-row, main .promo, main .acts, main .mail, main .empty { margin-left: -12px; margin-right: -12px; }
+  .tiles { padding-left: 4px; padding-right: 4px; }
+}
+
+/* Адаптив: значок Телеграма над заголовком */
+@media (max-width: 767px) { .tg-box > div { flex: 0 0 100%; min-width: 0; } }

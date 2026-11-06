@@ -44,6 +44,7 @@
     heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
     user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
     x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    chat: '<path d="M21 12a8 8 0 0 1-8 8H4l2-3.2A8 8 0 1 1 21 12Z"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
     right: '<path d="m9 6 6 6-6 6"/>', left: '<path d="m15 6-6 6 6 6"/>', down: '<path d="m6 9 6 6 6-6"/>', up: '<path d="m6 15 6-6 6 6"/>',
     plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>',
@@ -323,10 +324,10 @@
   /* ---------- Карточки в списках ---------- */
   const cardList = (id) => { const o = byAny(id); return (o.photos && o.photos.length ? [o.img].concat(o.photos.slice(1)) : [o.img]).slice(0, 5); };
   const swap = (o) => { const n = cardList(o.id).length; return { attr: n > 1 ? `data-swap="${o.id}"` : '', dots: n > 1 ? `<span class="pc-dots">${Array.from({ length: n }, (_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</span>` : '' }; };
-  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}, г. ${esc(s.city)}</span>`;
-  const sellerRate = (s) => (s.reviews ? `<span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b><span>${s.reviews} ${plural(s.reviews, 'отзыв', 'отзыва', 'отзывов')}</span></span>` : '<span class="pc-rate"><span>Новый продавец</span></span>');
+  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}<span class="pc-city">, г. ${esc(s.city)}</span></span>`;
+  const revCount = (n) => `<span class="pc-rev" aria-label="${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}">${ic('chat', 14)}<span>${n}</span></span>`;
+  const sellerRate = (s) => (s.reviews ? `<span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span>` : '<span class="pc-rate"><span>Новый продавец</span></span>');
   const badgeList = (it) => { const v = SELLERS[it.seller]; const b = []; if (v.freeFrom) b.push(`Бесплатная доставка от ${fmt(v.freeFrom)}`); if (v.safe) b.push('Безопасная сделка'); return b; };
-  const badges = (it) => { const b = badgeList(it); return b.length ? `<div class="pc-badges">${b.map((t) => `<span>${t}</span>`).join('')}</div>` : ''; };
   /* 25. Количество появляется вместо кнопки, при нуле кнопка возвращается */
   const qtyStep = (it, c, cls) => `<div class="step ${cls}" aria-label="Количество"><button data-act="cartQty" data-id="${it.id}" data-d="-1" aria-label="Меньше">${ic('minus', 16)}</button><input class="step-i" inputmode="numeric" aria-label="Количество" data-lineqty="${it.id}" value="${c.qty}"><button data-act="cartQty" data-id="${it.id}" data-d="1" ${c.qty >= it.stock ? 'disabled' : ''} aria-label="Больше">${ic('plus', 16)}</button></div>`;
   const heart = (id, fav) => `<button class="pc-heart ${fav ? 'fav-on' : ''}" data-act="fav" data-id="${id}" aria-label="В избранное" aria-pressed="${fav}">${ic('heart', 20)}</button>`;
@@ -335,7 +336,6 @@
     return `<article class="pc">
       <div class="pc-media" ${g.attr}>
         <a href="#/item/${it.id}" class="pc-img"><img loading="lazy" src="${it.img}" alt="${esc(it.title)}"></a>
-        ${badges(it)}
         ${g.dots}
       </div>
       <div class="pc-body">
@@ -353,9 +353,10 @@
       </div>
     </article>`;
   }
+  const URGENT_MS = 2 * 3600000;
   function acard(a) {
     const s = SELLERS[a.seller]; const fav = S.favs.includes(a.id); const g = swap(a);
-    const end = T0 + a.hours * 3600000; const urgent = a.hours < 24;
+    const end = T0 + a.hours * 3600000; const urgent = end - Date.now() <= URGENT_MS;
     const soon = 'data-act="soon" data-text="Лот и ставка это сценарий аукциона, соберём его следующим"';
     return `<article class="pc">
       <div class="pc-media" ${g.attr}>
@@ -430,13 +431,13 @@
 
       <section class="band band-next"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Популярные объявления</h2><a class="link row-l" href="#/catalog" data-act="homePop">Посмотреть все ${ic('right', 14)}</a></div>
-        <div class="grid">${popular.map(pcard).join('')}</div>
+        <div class="grid">${popular.map((x) => pcard(x)).join('')}</div>
       </div></section>
       ${howBlock('band white')}
 
       <section class="band"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Продавцы с лучшими отзывами</h2><a class="link row-l" href="#/" ${soon('Раздел «Продавцы» соберём отдельным блоком')}>Все продавцы ${ic('right', 14)}</a></div>
-        <div class="sell-row">${sellers.map(([k, ids]) => { const s = SELLERS[k]; return `<article class="sell-c"><a href="#/" ${soon('Страницу продавца соберём отдельным блоком')} class="sell-h"><span class="ava">${esc(s.name[0])}</span><span class="sell-b"><span class="row"><span class="sb">${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}</span><span class="t12 c2">г.\u00a0${esc(s.city)}</span><span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b><span>${s.reviews} ${plural(s.reviews, 'отзыв', 'отзыва', 'отзывов')}</span></span></span></a><div class="sell-items">${ids.map((id) => { const o = byAny(id); return `<a href="${byId(id) ? `#/item/${id}` : '#/'}" ${byId(id) ? '' : soon('Лот и ставка это сценарий аукциона, соберём его следующим')}><img loading="lazy" src="${o.img}" alt=""><span class="sell-p">${fmt(o.price)}</span><span class="sell-t">${esc(o.title)}</span></a>`; }).join('')}</div></article>`; }).join('')}</div>
+        <div class="sell-row">${sellers.map(([k, ids]) => { const s = SELLERS[k]; return `<article class="sell-c"><a href="#/" ${soon('Страницу продавца соберём отдельным блоком')} class="sell-h"><span class="ava">${esc(s.name[0])}</span><span class="sell-b"><span class="row"><span class="sb">${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}</span><span class="t12 c2">г.\u00a0${esc(s.city)}</span><span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span></span></a><div class="sell-items">${ids.map((id) => { const o = byAny(id); return `<a href="${byId(id) ? `#/item/${id}` : '#/'}" ${byId(id) ? '' : soon('Лот и ставка это сценарий аукциона, соберём его следующим')}><img loading="lazy" src="${o.img}" alt=""><span class="sell-p">${fmt(o.price)}</span><span class="sell-t">${esc(o.title)}</span></a>`; }).join('')}</div></article>`; }).join('')}</div>
       </div></section>
 
       <section class="band white"><div class="wrap comm">
@@ -611,7 +612,7 @@
         <span class="ava">${esc(s.name[0])}</span>
         <div style="min-width:0;flex:1">
           <div class="row"><a class="sb" href="#/" ${page}>${esc(s.name)}</a>${s.pro ? '<span class="tag pro">PRO</span>' : ''}</div>
-          <div class="rate-row"><span>г.\u00a0${esc(s.city)}</span>${rating(s)}<button class="link" data-act="itab" data-v="reviews">${reviewsTxt}</button></div>
+          <div class="rate-row"><span>г.\u00a0${esc(s.city)}</span>${rating(s)}${s.reviews ? `<a class="link" href="#/reviews/${it.seller}" target="_blank">${reviewsTxt}</a>` : `<span>${reviewsTxt}</span>`}</div>
         </div>
       </div>
       <dl class="seller-stats">
@@ -674,6 +675,12 @@
     const html = blocks.map((b) => (b.k === 'h' ? `<h3 class="d-h">${esc(b.t)}</h3>` : b.k === 'ul' ? `<ul class="d-ul">${b.li.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p class="d-p">${esc(b.t)}</p>`)).join('');
     return `<div class="d-text ${open ? '' : 'clamped'}">${html}</div>${long ? `<button class="linkbtn" style="margin-top:8px" data-act="descT">${open ? 'Свернуть' : 'Показать полностью'} ${ic(open ? 'up' : 'down', 16)}</button>` : ''}`;
   }
+  const ITEM_TAGS = { // пример
+    strudd: ['#3d_печать', '#32_мм', '#miniature', '#boss'], trukk: ['#boyz', '#gretchin', '#army'], zeratul: ['#miniature', '#games'], worldeaters: ['#army', '#grimdark', '#10th_edition'],
+    warriors: ['#army', '#grimdark', '#10th_edition'], skorpekh: ['#boss', '#grimdark', '#miniature'], lutazy: ['#boyz', '#bits'], terminators: ['#army', '#10th_edition'],
+    brutalis: ['#miniature', '#10th_edition'], darkshroud: ['#miniature', '#10th_edition'], yucatan: ['#games'], arkham: ['#games'], zombicide: ['#games', '#miniature'],
+    assassins: ['#3d_печать', '#32_мм', '#miniature'], prisoners: ['#3d_печать', '#28_мм', '#miniature'],
+  };
   const COMMENTS = [ // пример
     { who: 'User51234', date: '02 ноября 2026', text: 'Подскажите, база идёт в комплекте или её нужно докупать отдельно?', replies: [{ who: 'PocketSized Prints', seller: true, date: '02 ноября 2026', text: 'База в комплекте, миниатюра с базой на 32 мм.' }, { who: 'User51234', date: '03 ноября 2026', text: 'Спасибо!' }] },
     { who: 'GriinWan', date: '28 октября 2026', text: 'Можно напечатать в другом масштабе?', replies: [{ who: 'PocketSized Prints', seller: true, date: '28 октября 2026', text: 'Да, напишите в комментарии к заказу, какой масштаб нужен.' }] },
@@ -691,14 +698,35 @@
     return `<div class="rev-sum"><div class="rev-avg"><span class="big">${s.rating.toFixed(2)}</span><span class="t12 c2">${s.reviews} ${plural(s.reviews, 'отзыв', 'отзыва', 'отзывов')}</span></div>
       <div class="rev-bars">${d.map((v, i) => `<div class="rev-b"><span>${5 - i}</span>${STAR}<i><u style="width:${Math.round((v / max) * 100)}%"></u></i><span class="c2">${v}</span></div>`).join('')}</div></div>`;
   }
+  function reviewsBody(revs, summary, more) {
+    const sorted = revs.slice();
+    if (ui.revSort === 'old') sorted.reverse();
+    if (ui.revSort === 'good') sorted.sort((a, b) => Number(b.good) - Number(a.good));
+    if (ui.revSort === 'bad') sorted.sort((a, b) => Number(a.good) - Number(b.good));
+    return `${summary}
+        ${revs.length > 1 ? `<div class="rev-bar">${dd('rev', ui.revSort, [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['good', 'Сначала с высокой оценкой'], ['bad', 'Сначала с низкой оценкой']], { aria: 'Сортировка отзывов' })}</div>` : ''}
+        ${sorted.map((v) => `<article class="rev"><div class="between"><span class="sb">${esc(v.who)}</span><span class="t12 c3">${esc(v.date)}</span></div><div class="rev-st" aria-label="Оценка ${v.good ? 5 : 1} из 5">${[1, 2, 3, 4, 5].map((x) => `<span class="${x <= (v.good ? 5 : 1) ? 'on' : ''}">${STAR}</span>`).join('')}</div><p>${esc(v.text)}</p></article>`).join('')}
+        ${more}`;
+  }
+  function pageSellerReviews(r) {
+    const s = SELLERS[r.id] || SELLERS.pocket; const revs = REVIEWS[r.id] || [];
+    const more = s.reviews > revs.length ? '<button class="btn secondary" style="margin-top:8px" data-act="soon" data-text="В прототипе показаны примеры отзывов">Показать все отзывы</button>' : '';
+    return `<div class="wrap page">
+      ${crumbs([HOME_C, { t: s.name }, { t: 'Отзывы' }])}
+      <h1 class="h1">Отзывы о продавце</h1>
+      <div class="row rev-who"><span class="sb">${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}<span class="c2">г.\u00a0${esc(s.city)}</span></div>
+      <section class="card rev-page">${s.reviews ? reviewsBody(revs, revSummary(s), more) : `<p class="c2">У этого продавца пока нет отзывов. Он на площадке ${esc(s.stazh)}</p>`}</section>
+    </div>`;
+  }
   function pageItem(r) {
     const it = byId(r.id) || ITEMS[0];
     const s = SELLERS[it.seller]; const revs = REVIEWS[it.seller] || [];
-    const tabs = [['desc', 'Описание'], ['talk', 'Обсуждение', 0], ['reviews', 'Отзывы о продавце', s.reviews]];
+    const tabs = [['desc', 'Описание'], ['talk', 'Обсуждение', 0], ['reviews', 'Отзывы о товаре', revs.length]];
     const similar = ITEMS.filter((i) => i.id !== it.id && i.top === it.top).slice(0, 4);
     let tabBody = '';
     if (ui.tab === 'desc') {
-      tabBody = `${it.specs.length ? `<h2 class="h3 d-sec">Характеристики</h2><dl class="spec">${it.specs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+      tabBody = `${(ITEM_TAGS[it.id] || []).length ? `<div class="d-tags">${ITEM_TAGS[it.id].map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join('')}</div>` : ''}
+        ${it.specs.length ? `<h2 class="h3 d-sec">Характеристики</h2><dl class="spec">${it.specs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
         <h2 class="h3 d-sec">Описание</h2>${descHtml(it)}
         <div class="d-foot"><span class="t12 c3">Опубликовано ${esc(it.added)}</span><button class="linkbtn" style="color:var(--text-2)" data-act="report">${ic('flag', 16)}Пожаловаться на объявление</button></div>`;
     } else if (ui.tab === 'talk') {
@@ -708,15 +736,9 @@
         ${S.flags.auth ? `<div class="cm-form"><label class="fld"><span class="lbl">Ваш вопрос или комментарий</span><textarea class="inp" id="cmText" rows="3" placeholder="Например, есть ли дополнительные фото"></textarea></label><div class="between"><button class="linkbtn" data-act="soon" data-text="Прикрепление изображений как на сайте">${ic('clip', 16)}Изображения</button><button class="btn primary" data-act="comment" data-id="${it.id}">Отправить</button></div></div>`
           : `<div class="note info">${ic('info')}<div class="body">Чтобы задать вопрос, войдите в\u00a0аккаунт. <button class="linkbtn" data-act="login">Войти</button></div></div>`}`;
     } else {
-      const sorted = revs.slice();
-      if (ui.revSort === 'old') sorted.reverse();
-      if (ui.revSort === 'good') sorted.sort((a, b) => Number(b.good) - Number(a.good));
-      if (ui.revSort === 'bad') sorted.sort((a, b) => Number(a.good) - Number(b.good));
-      tabBody = s.reviews ? `${revSummary(s)}
-        ${revs.length > 1 ? `<div class="rev-bar">${dd('rev', ui.revSort, [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['good', 'Сначала с высокой оценкой'], ['bad', 'Сначала с низкой оценкой']], { aria: 'Сортировка отзывов' })}</div>` : ''}
-        ${sorted.map((v) => `<article class="rev"><div class="between"><span class="sb">${esc(v.who)}</span><span class="t12 c3">${esc(v.date)}</span></div><div class="rev-st" aria-label="Оценка ${v.good ? 5 : 1} из 5">${[1, 2, 3, 4, 5].map((x) => `<span class="${x <= (v.good ? 5 : 1) ? 'on' : ''}">${STAR}</span>`).join('')}</div><p>${esc(v.text)}</p></article>`).join('')}
-        ${s.reviews > revs.length ? '<button class="btn secondary" style="margin-top:8px" data-act="soon" data-text="Полный список отзывов будет на странице продавца">Показать все отзывы</button>' : ''}`
-        : '<p class="c2">У этого продавца пока нет отзывов. Он на площадке ' + esc(s.stazh) + '</p>';
+      const neg = revs.filter((v) => !v.good).length;
+      const avg = revs.reduce((n, v) => n + (v.good ? 5 : 1), 0) / (revs.length || 1);
+      tabBody = revs.length ? reviewsBody(revs, revSummary({ rating: avg, reviews: revs.length, neg }), '') : '<p class="c2">Отзывов о\u00a0товаре пока нет</p>';
     }
     return `<div class="wrap page">
       ${crumbs([HOME_C, CAT_C].concat(it.crumbs.map((c) => ({ t: c, a: `data-act="nodeq" data-v="${esc(c)}"` }))))}
@@ -766,13 +788,16 @@
     return `<div class="rel"><button class="rel-t" data-act="relT" data-k="${g.sid}" aria-expanded="${!off}"><span>Другие товары продавца</span>${ic(off ? 'down' : 'up', 16)}</button>
       ${off ? '' : `<p class="t12 c2 rel-h">Они войдут в этот же заказ у продавца</p><div class="rel-list">${rel.slice(0, 6).map((i) => `<a class="rl" href="#/item/${i.id}"><img loading="lazy" src="${i.img}" alt=""><span class="rl-p">${fmt(i.price)}</span><span class="rl-t">${esc(i.title)}</span></a>`).join('')}</div>`}</div>`;
   }
+  const REC_IDS = ['terminators', 'darkshroud', 'yucatan', 'arkham', 'zombicide', 'warriors'];
   function viewedBlock(exclude) {
-    const seen = S.viewed.filter((id) => !exclude.includes(id)).slice(0, 4);
-    const ids = seen.length ? seen : ['prisoners', 'lutazy', 'warriors', 'zeratul'].filter((id) => !exclude.includes(id));
-    return `<section class="sec"><div class="sec-hd"><h2 class="h2">Вы смотрели</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
+    const seen = S.viewed.filter((id) => !exclude.includes(id));
+    const pool = ['prisoners', 'lutazy', 'warriors', 'zeratul'].concat(ITEMS.map((i) => i.id)).filter((id) => !exclude.includes(id) && !REC_IDS.includes(id));
+    const ids = seen.concat(pool).filter((id, i, a) => a.indexOf(id) === i).slice(0, 8);
+    const open = ui.viewedMore;
+    return `<section class="sec"><div class="sec-hd"><h2 class="h2">Вы смотрели</h2></div><div class="${open ? 'grid' : 'scroller'}">${ids.slice(0, open ? 8 : 4).map((id) => pcard(byId(id))).join('')}</div>${ids.length > 4 ? `<div class="sec-more"><button class="btn secondary" data-act="viewedT">${open ? 'Свернуть' : 'Показать ещё'}</button></div>` : ''}</section>`;
   }
   function recsBlock(exclude) {
-    const ids = ['terminators', 'darkshroud', 'yucatan', 'arkham', 'zombicide', 'warriors'].filter((id) => !exclude.includes(id) && !S.viewed.slice(0, 4).includes(id)).slice(0, 4);
+    const ids = REC_IDS.filter((id) => !exclude.includes(id) && !S.viewed.slice(0, 4).includes(id)).slice(0, 4);
     return `<section class="sec"><div class="sec-hd"><h2 class="h2">Может понравиться</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
   }
   function cartCta(blocked, anyOut, minBad) {
@@ -1232,7 +1257,7 @@
   }
 
   /* ---------- Рендер ---------- */
-  const PAGES = { home: pageHome, catalog: pageCatalog, item: pageItem, cart: pageCart, checkout: pageCheckout, success: pageSuccess, email: pageEmail };
+  const PAGES = { home: pageHome, catalog: pageCatalog, item: pageItem, cart: pageCart, checkout: pageCheckout, success: pageSuccess, email: pageEmail, reviews: pageSellerReviews };
   function itemSticky(it) {
     if (S.flags.soldOut) return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">Нет в наличии</span></div><a class="btn secondary lg" href="#/catalog">Похожие товары</a></div>`;
     const c = inCart(it.id);
@@ -1269,6 +1294,7 @@
   function tick() {
     document.querySelectorAll('[data-end]').forEach((e) => {
       const ms = +e.dataset.end - Date.now(); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+      e.parentNode.classList.toggle('urgent', ms <= URGENT_MS);
       e.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     });
   }
@@ -1373,6 +1399,7 @@
     crumbs() { ui.crumbs = !ui.crumbs; render(); },
     goHome(el, ev) { ev.preventDefault(); go('#/'); },
     tagq(el) { toast(`Выдача по тегу ${el.dataset.v}: одинаковые теги объединяем`); },
+    viewedT() { ui.viewedMore = !ui.viewedMore; render(); },
     homePop() { S.cat = Object.assign(DEFCAT(), { closed: S.cat.closed, sort: 'pop' }); save(); go('#/catalog'); },
     resetCat() { const closed = S.cat.closed; S.cat = Object.assign(DEFCAT(), { closed }); save(); if (ui.filters) overlay(); render(); },
     dropF(el) {
@@ -1510,7 +1537,7 @@
   document.addEventListener('focusin', (ev) => {
     const t = ev.target;
     if (t.id === 'city') { ui.cityOpen = true; document.getElementById('cityList').innerHTML = cityList(t.value); }
-    if (t.name === 'q' && t.closest('[data-form=search]')) { t.placeholder = 'Поиск по объявлениям'; openSearch(t.closest('form'), false); }
+    if (t.name === 'q' && t.closest('[data-form=search]')) { t.placeholder = ' '; openSearch(t.closest('form'), false); }
   });
   document.addEventListener('focusout', (ev) => {
     const t = ev.target;

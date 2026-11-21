@@ -90,7 +90,7 @@
   }
 
   /* ---------- Состояние ---------- */
-  const DEFCAT = () => ({ tab: 'all', node: null, sort: 'new', per: 24, q: '', min: '', max: '', country: 'Все', city: 'Все', f: {}, view: 'two' });
+  const DEFCAT = () => ({ tab: 'all', node: null, tag: '', sort: 'new', per: 24, q: '', min: '', max: '', country: 'Все', city: 'Все', f: {}, view: 'two' });
   const DEF = () => ({
     cart: [], favs: [], viewed: [], lang: 'RUS', cur: 'RUB',
     form: {}, co: { city: '', cityTxt: '', dl: {}, pay: {}, safe: {}, pvz: {}, comment: {}, promo: {}, certificates: [] },
@@ -561,6 +561,7 @@
     const hit = ({ o }) => {
       if (c.node) { const n = c.node.toLowerCase(); if (!(o.cat.toLowerCase() === n || o.top.toLowerCase() === n || (o.crumbs || []).some((x) => x.toLowerCase() === n))) return false; }
       if (q && !(o.title.toLowerCase().includes(q) || o.cat.toLowerCase().includes(q))) return false;
+      if (c.tag && !ITEM_TAGS[o.id]?.includes(c.tag)) return false;
       if (c.min && o.price < +c.min) return false;
       if (c.max && o.price > +c.max) return false;
       if (c.city !== 'Все' && SELLERS[o.seller].city !== c.city) return false;
@@ -701,11 +702,12 @@
   }
   function pageCatalog() {
     const c = S.cat; const src = ui.applied || S.cat; const list = catalogList(src); const act = activeFilters(src);
+    const tags = c.tag ? [c.tag, ...TAGS.filter((tag) => tag !== c.tag)] : TAGS;
     const count = `${list.length} ${plural(list.length, 'объявление', 'объявления', 'объявлений')}`;
     return `<div class="wrap page purchase-catalog">
       ${crumbs([HOME_C, CAT_C].concat(nodeCrumbs(c.node)))}
       <div class="between" style="margin-bottom:12px"><h1 class="h1">${c.q ? `Поиск: ${esc(c.q)}` : esc(c.node || 'Каталог')}</h1><span class="c3 cat-count">${count}</span></div>
-      ${clampRow('tags', TAGS.map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join(''), 'one')}
+      ${clampRow('tags', tags.map((t) => `<button class="chip plain" data-act="tagq" data-v="${esc(t)}" aria-pressed="${t === c.tag}">${esc(t)}</button>`).join(''), 'one')}
       <div class="cat-layout">
         ${ui.fTip && ui.applied ? `<div class="flt-tip" id="fltTip"><button class="btn primary sm" data-act="fltApply">${showFilterResults()}</button></div>` : ''}
         <aside class="cat-side" aria-label="Фильтры">${filtersHtml()}<div class="flt-act"><button class="btn ghost sm" data-act="resetCat">Сбросить</button><button class="btn secondary sm" data-act="saveSearch">${ic('save', 16)}Сохранить поиск</button></div></aside>
@@ -818,7 +820,7 @@
     const html = blocks.map((b) => (b.k === 'h' ? `<h3 class="d-h">${esc(b.t)}</h3>` : b.k === 'ul' ? `<ul class="d-ul">${b.li.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : `<p class="d-p">${esc(b.t)}</p>`)).join('');
     return `<div class="d-text ${open ? '' : 'clamped'}">${html}</div>${long ? `<button class="linkbtn" style="margin-top:8px" data-act="descT">${open ? 'Свернуть' : 'Показать полностью'} ${ic(open ? 'up' : 'down', 16)}</button>` : ''}`;
   }
-  const ITEM_TAGS = { // пример
+  const ITEM_TAGS = { // примеры тегов объявлений
     strudd: ['#3d_печать', '#32_мм', '#miniature', '#boss'], trukk: ['#boyz', '#gretchin', '#army'], zeratul: ['#miniature', '#games'], worldeaters: ['#army', '#grimdark', '#10th_edition'],
     warriors: ['#army', '#grimdark', '#10th_edition'], skorpekh: ['#boss', '#grimdark', '#miniature'], lutazy: ['#boyz', '#bits'], terminators: ['#army', '#10th_edition'],
     brutalis: ['#miniature', '#10th_edition'], darkshroud: ['#miniature', '#10th_edition'], yucatan: ['#games'], arkham: ['#games'], zombicide: ['#games', '#miniature'],
@@ -1472,31 +1474,30 @@
 
   /* ---------- ЛК: общая оболочка ---------- */
   const atH = (h) => dateStr(new Date(T0 + h * 3600000));
-  const hrsLeft = (h) => (h > 48 ? `${Math.floor(h / 24)} дн. ${h % 24} ч` : `${h} ч`);
   const wonIds = () => { const a = Object.keys(S.won || {}); if (!S.flags.noBids) a.push('a-redemptor'); return a.filter((x, i) => a.indexOf(x) === i && !(S.wonDone || []).includes(x)); };
   const wonNeed = () => (isAuth() ? wonIds().length : 0);
   const LK_MENU = [['orders', 'Покупки', '#/lk/orders'], ['auctions', 'Торги', '#/lk/auctions'], ['sell', 'Продажи'], ['products', 'Товары'], ['payment', 'Баланс'], ['settings', 'Настройки']];
   function lkShell(cur, body) {
     const item = ([k, t, href]) => (href ? `<a class="lk-l ${cur === k ? 'on' : ''}" href="${href}"><span>${t}</span>${k === 'auctions' && wonNeed() ? `<span class="badge-i">${wonNeed()}</span>` : ''}</a>` : `<button class="lk-l" data-act="soon" data-text="${k === 'settings' ? 'Поля ЛК это блок первого визита' : 'Этот раздел относится к блоку продажи'}">${t}</button>`);
-    return `<div class="wrap page"><div class="lk">
+    return `<div class="wrap page lk-page"><div class="lk">
       <aside class="lk-side" aria-label="Личный кабинет"><div class="lk-u"><span class="ava">${esc(myName()[0])}</span><span class="sb">${esc(myName())}</span></div>
         ${S.flags.minus ? `<p class="lk-bal">Баланс: <b>−55 ₽</b></p>` : ''}
         <nav class="lk-nav">${LK_MENU.map(item).join('')}<button class="lk-l" data-act="logout">Выход</button></nav></aside>
       <div class="lk-main">${body}</div>
     </div></div>`;
   }
-  const lkGuest = (t) => `<div class="wrap page"><div class="empty"><div class="ico">${ic('user', 28)}</div><p class="h3">${t}</p><p class="c2" style="margin:4px 0 16px">Если заказ оформлен без регистрации, логин и пароль пришли на вашу почту</p><button class="btn primary" data-act="login">Войти</button></div></div>`;
+  const lkGuest = (t, title) => `<div class="wrap page">${title ? `<h1 class="h1" style="margin-bottom:12px">${title}</h1>` : ''}<div class="empty"><div class="ico">${ic('user', 28)}</div><p class="h3">${t}</p><p class="c2" style="margin:4px 0 16px">Если заказ оформлен без регистрации, логин и пароль пришли на вашу почту</p><button class="btn primary" data-act="login">Войти</button></div></div>`;
 
   /* ---------- ЛК: покупки ---------- */
   const LK_BASE = [
-    { no: 464812, st: 'approve', dl: 'yd', pay: 'card', left: 47, lines: [{ id: 'strudd', qty: 1 }] },
-    { no: 464811, st: 'pay', dl: 'post', pay: 'card', left: 70, lines: [{ id: 'zeratul', qty: 1 }] },
-    { no: 464809, st: 'pay', dl: 'pickup', pay: 'cash', left: 70, lines: [{ id: 'brutalis', qty: 1 }] },
-    { no: 464808, st: 'pay', dl: 'yd', pay: 'safe', left: 70, lines: [{ id: 'assassins', qty: 1 }] },
-    { no: 464806, st: 'paid', dl: 'cdek', pay: 'card', left: 30, lines: [{ id: 'darkshroud', qty: 1 }], receipt: 'чек-464806.pdf' },
+    { no: 464812, st: 'approve', dl: 'yd', pay: 'card', left: 47, deadlineLabel: '8 ноября, 20:36', lines: [{ id: 'strudd', qty: 1 }] },
+    { no: 464811, st: 'pay', dl: 'post', pay: 'card', left: 70, deadlineLabel: '9 ноября, 19:36', lines: [{ id: 'zeratul', qty: 1 }] },
+    { no: 464809, st: 'pay', dl: 'pickup', pay: 'cash', left: 70, deadlineLabel: '9 ноября, 19:36', lines: [{ id: 'brutalis', qty: 1 }] },
+    { no: 464808, st: 'pay', dl: 'yd', pay: 'safe', left: 70, deadlineLabel: '9 ноября, 19:36', lines: [{ id: 'assassins', qty: 1 }] },
+    { no: 464806, st: 'paid', dl: 'cdek', pay: 'card', left: 30, deadlineLabel: '8 ноября, 06:40', lines: [{ id: 'darkshroud', qty: 1 }], receipt: 'чек-464806.pdf' },
     { no: 464805, st: 'paid', dl: 'yd', pay: 'safe', left: 62, lines: [{ id: 'strudd', qty: 1 }] },
-    { no: 464803, st: 'process', dl: 'post', pay: 'card', left: 62, lines: [{ id: 'warriors', qty: 1 }], receipt: 'чек-464803.jpg' },
-    { no: 464798, st: 'sent', dl: 'post', pay: 'card', left: 120, lines: [{ id: 'trukk', qty: 1 }], track: '80080012345678', receipt: 'чек-464798.png' },
+    { no: 464803, st: 'process', dl: 'post', pay: 'card', left: 62, deadlineLabel: '8 ноября, 06:40', changeDeadlineLabel: '9 ноября, 11:42', lines: [{ id: 'warriors', qty: 1 }], receipt: 'чек-464803.jpg' },
+    { no: 464798, st: 'sent', dl: 'post', pay: 'card', left: 120, deadlineLabel: '11 ноября, 21:42', lines: [{ id: 'trukk', qty: 1 }], track: '80080012345678', receipt: 'чек-464798.png' },
     { no: 464790, st: 'got', dl: 'yd', pay: 'card', lines: [{ id: 'prisoners', qty: 2 }], track: 'YD102938475', receipt: 'чек-464790.pdf' },
     { no: 464788, st: 'got', dl: 'yd', pay: 'card', lines: [{ id: 'prisoners', qty: 2 }], review: { stars: 5, text: 'Всё пришло вовремя, упаковано хорошо' } },
     { no: 464781, st: 'dispute', dl: 'post', pay: 'card', stop: 5, lines: [{ id: 'arkham', qty: 1 }], track: '80080098765432', receipt: 'чек-464781.pdf', by: 'buyer' },
@@ -1511,24 +1512,39 @@
   const lkSum = (o) => o.lines.reduce((a, l) => a + byId(l.id).price * l.qty, 0);
   const lkFee = (o) => (orderSafe(o) ? (o.fee ?? safeFee(lkSum(o))) : 0);
   const lkTotal = (o) => o.total ?? (lkSum(o) + DELIVERY[o.dl].price + lkFee(o));
+  const lkDeadline = (o, changeDemo = false) => S.lkO?.[o.no]?.left == null
+    ? (changeDemo && o.changeDeadlineLabel) || o.deadlineLabel || atH(o.left)
+    : atH(o.left);
   const OST = {
     approve: { t: 'Ожидает подтверждения', c: 'wait' }, pay: { t: 'Ожидает оплату', c: 'act' }, paid: { t: 'Произведена оплата', c: 'wait' }, process: { t: 'В обработке', c: 'wait' },
     sent: { t: 'Отправлен', c: 'act' }, got: { t: 'Получен', c: 'ok' }, dispute: { t: 'Спор', c: 'bad' }, cancel: { t: 'Отменён', c: 'mute' },
   };
-  function lkNext(o) {
+  function lkOrderNote(o) {
     const s = SELLERS[lkSeller(o)];
-    const d = (h) => `${atH(h)}, осталось ${hrsLeft(h)}`;
-    if (o.st === 'approve') return { h: 'Ждём ответ продавца', p: 'Он проверит наличие и стоимость доставки. Платить пока не нужно. Если не ответит, заказ отменится', d: `Ответ до ${d(o.left)}` };
-    if (o.st === 'pay' && o.pay === 'cash') return { h: 'Оплата при встрече', p: `Договоритесь с ${s.name} о месте и времени. Чек загружать не нужно`, d: `Встреча до ${d(o.left)}` };
-    if (o.st === 'pay' && orderSafe(o)) return { h: 'Оплатите заказ онлайн', p: 'Деньги останутся у нас и перейдут продавцу, когда вы подтвердите получение', d: `Оплатить до ${d(o.left)}` };
-    if (o.st === 'paid' && orderSafe(o)) return { h: 'Деньги у сервиса', p: 'Продавец готовит заказ. Он получит деньги, когда вы подтвердите получение', d: `Отправка до ${d(o.left)}` };
-    if (o.st === 'pay') return { h: 'Оплатите заказ', p: 'Переведите сумму продавцу и приложите чек. Если не успеть, заказ отменится', d: `Оплатить до ${d(o.left)}` };
-    if (o.st === 'paid') return { h: 'Продавец проверяет оплату', p: 'Если он не ответит, через 48 часов заказ сам перейдёт в обработку', d: `Проверка до ${d(o.left)}` };
-    if (o.st === 'process') return { h: 'Продавец готовит заказ', p: 'Когда он отправит посылку, здесь появится трек-номер', d: `Отправка до ${d(o.left)}` };
-    if (o.st === 'sent') return { h: 'Заказ в пути', p: 'Когда получите, подтвердите получение. Если что-то не так, сначала откройте спор: после подтверждения его не открыть', d: `Спор можно открыть до ${d(o.left)}` };
+    const changeDemo = route().q.demo === 'change-order';
+    const date = lkDeadline(o, changeDemo);
+    if (o.st === 'approve') return { h: 'Ждём ответ продавца', p: 'Он проверит наличие и стоимость доставки. Платить пока не нужно. Если не ответит, заказ отменится', d: `Ждём до ${date}` };
+    if (o.st === 'pay' && o.pay === 'cash') return { h: 'Договоритесь с продавцом о встрече', p: `Обсудите с ${s.name} место и время. Чек после встречи загружать не нужно`, d: `Договоритесь до ${date}` };
+    if (o.st === 'pay' && orderSafe(o)) return { h: 'Оплатите заказ онлайн', p: 'Деньги останутся у нас и перейдут продавцу, когда вы подтвердите получение', d: `Оплатите до ${date}` };
+    if (o.st === 'paid' && orderSafe(o)) return { h: 'Деньги у сервиса', p: 'Продавец готовит заказ. Он получит деньги, когда вы подтвердите получение', d: `Отправит до ${date}` };
+    if (o.st === 'pay') return { h: 'Оплатите заказ', p: 'Переведите сумму продавцу и приложите чек. Если не успеть, заказ отменится', d: `Оплатить до ${date}, осталось ${o.left} ч` };
+    if (o.st === 'paid') return { h: 'Продавец проверяет оплату', p: 'Если он не ответит, через 48 часов заказ сам перейдёт в обработку', d: `Проверит до ${date}` };
+    if (o.st === 'process') return { h: 'Продавец готовит заказ', p: 'Когда он отправит посылку, здесь появится трек-номер', d: `${changeDemo ? 'до' : 'Отправит до'} ${date}` };
+    if (o.st === 'sent') return { h: 'Заказ в пути', p: 'Когда получите, подтвердите получение. Если что-то не так, сначала откройте спор: после подтверждения его не открыть', d: `Спор можно открыть до ${date}` };
     if (o.st === 'got') return o.review ? { h: 'Спасибо за отзыв', p: 'Он появился на странице продавца' } : { h: 'Заказ получен', p: 'Отзыв поможет другим покупателям выбрать продавца' };
     if (o.st === 'dispute') return { h: o.by === 'buyer' ? 'Вы открыли спор' : 'Спор открыл продавец', p: 'Напишите нам на почту: укажите номер заказа и опишите причину. Деньги и посылку обсудим в переписке' };
     return { h: 'Заказ отменён', p: o.why };
+  }
+  function lkCardNote(o) {
+    const date = lkDeadline(o);
+    if (o.st === 'approve') return `Ждём ответ продавца до ${date}`;
+    if (o.st === 'pay' && o.pay === 'cash') return `Встретьтесь с продавцом и оплатите до ${date}`;
+    if (o.st === 'pay' && orderSafe(o)) return `Оплатите заказ онлайн до ${date}`;
+    if (o.st === 'pay') return `Оплатите заказ до ${date}`;
+    if (o.st === 'paid' && !orderSafe(o)) return `Продавец проверит оплату до ${date}`;
+    if (o.st === 'paid' || o.st === 'process') return `Продавец отправит заказ до ${date}`;
+    if (o.st === 'sent') return `Заказ в пути. Спор можно открыть до ${date}`;
+    return lkOrderNote(o).h;
   }
   /* ---------- ЛК: заказ, шаги ---------- */
   function lkTimeline(o) {
@@ -1536,11 +1552,11 @@
     const steps = [
       { done: 'Заказ оформлен', now: 'Заказ оформлен', d: '' },
       { done: 'Продавец подтвердил заказ', now: 'Продавец подтверждает заказ', d: 'Проверяет наличие и стоимость доставки' },
-      { done: cash ? 'Оплата при встрече' : safe ? 'Заказ оплачен онлайн' : 'Заказ оплачен', now: o.st === 'paid' ? 'Продавец проверяет оплату' : cash ? 'Договоритесь об оплате при встрече' : safe ? 'Оплатите заказ онлайн' : 'Оплатите заказ и приложите чек', d: safe ? 'Деньги останутся у нас, пока вы не получите заказ' : '' },
+      { done: cash ? 'Оплата при встрече' : safe ? 'Заказ оплачен онлайн' : 'Заказ оплачен', now: cash ? 'Договоритесь об оплате при встрече' : safe ? 'Оплатите заказ онлайн' : o.st === 'paid' ? 'Продавец проверяет оплату' : 'Оплатите заказ и приложите чек', d: safe ? 'Деньги останутся у нас, пока вы не получите заказ' : '' },
       { done: pickup ? 'Заказ передан' : 'Заказ отправлен', now: pickup ? 'Продавец готовит заказ к встрече' : 'Продавец отправляет заказ', d: '' },
       { done: 'Заказ получен', now: 'Получите заказ и подтвердите', d: safe ? 'После подтверждения продавец получит деньги' : '' },
     ];
-    const cur = { approve: 1, pay: 2, paid: 2, process: 3, sent: 4, got: 5 }[o.st];
+    const cur = { approve: 1, pay: 2, paid: safe ? 3 : 2, process: 3, sent: 4, got: 5 }[o.st];
     const stop = o.stop;
     const li = (cls, n, t, d) => `<li class="${cls}"><span class="d">${cls === 'done' ? ic('check', 14) : cls === 'stop' ? ic('x', 14) : n}</span><div><p class="tl-t">${esc(t)}</p>${d ? `<p class="tl-d">${esc(d)}</p>` : ''}</div></li>`;
     if (stop !== undefined) return `<ol class="tl">${steps.slice(0, stop).map((x, i) => li('done', i + 1, x.done, '')).join('')}${li('stop', stop + 1, o.st === 'dispute' ? 'Открыт спор' : 'Заказ отменён', o.st === 'cancel' ? o.why : '')}</ol>`;
@@ -1566,12 +1582,14 @@
   function pageLkOrder(no) {
     const o = lkGet(no);
     if (!o) return lkShell('orders', `<div class="empty"><p class="h3">Заказ не найден</p><a class="btn primary" style="margin-top:16px" href="#/lk/orders">Все покупки</a></div>`);
-    const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const n = lkNext(o); const D = DELIVERY[o.dl];
+    const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const n = lkOrderNote(o); const D = DELIVERY[o.dl];
     const row = (k, v) => `<div class="info-r"><dt>${k}</dt><dd>${v}</dd></div>`;
     const delivery = o.delivery ?? D.price;
     const main = lkMainAct(o); const manage = lkManage(o);
-    return lkShell('orders', `<a class="back" href="#/lk/orders">${ic('left', 16)}Все покупки</a>
-      <div class="ordp-hd"><h1 class="h1">Заказ №${o.no}</h1><span class="ost ${st.c}">${st.t}</span></div>
+    return lkShell('orders', `<header class="ordp-head">
+        <a class="back" href="#/lk/orders">${ic('left', 16)}Все покупки</a>
+        <div class="ordp-hd${o.st === 'pay' && !orderSafe(o) && o.pay === 'card' ? ' ordp-hd-transfer' : ''}"><h1 class="h1">Заказ №${o.no}</h1><span class="ost ${st.c}">${st.t}</span></div>
+      </header>
       <div class="ordp">
         <div class="stack-12">
           <section class="ord-next ord-next-p ${st.c}"><p class="h3">${esc(n.h)}</p><p>${esc(n.p)}</p>${n.d ? `<p class="ord-dead">${ic('clock', 16)}<span>${esc(n.d)}</span></p>` : ''}${o.cancelReq ? '<p class="c2">Запрос на отмену отправлен продавцу</p>' : ''}${o.dlReq ? '<p class="c2">Запрос на смену доставки отправлен продавцу</p>' : ''}</section>
@@ -1581,24 +1599,24 @@
           <section class="card"><h2 class="h3 ordp-t">Доставка и оплата</h2><dl class="info">
             ${row('Способ получения', esc(D.title))}
             ${o.track ? row('Трек-номер', `${esc(o.track)} <button class="linkbtn" data-act="copy" data-v="${esc(o.track)}">Скопировать</button>`) : ''}
-            ${row('Способ оплаты', esc(PAYWAY[orderMethod(o)].title))}
+            ${row('Способ оплаты', esc(PAYWAY[orderSafe(o) ? 'safe' : orderMethod(o)].title))}
             ${o.receipt ? row('Чек', `<button class="linkbtn" data-act="soon" data-text="Файл открывается в новой вкладке">${ic('clip', 16)}${esc(o.receipt)}</button>`) : ''}
           </dl></section>
         </div>
         <aside class="stack-12 ordp-side">
-          <section class="card stack-8 lk-order-total"><div class="sum-row"><span class="c2">Товары</span><span class="v">${fmt(lkSum(o))}</span></div><div class="sum-row"><span class="c2">Доставка</span><span class="v">${delivery ? fmt(delivery) : 'бесплатно'}</span></div>${appliedOrderDiscounts(o)}${lkFee(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(lkFee(o))}</span></div>` : ''}<div class="sum-total"><span>Итого</span><span class="v">${fmt(lkTotal(o))}</span></div>${main}</section>
-          <section class="card stack-8"><h2 class="h3">Продавец</h2><a class="link" href="#/reviews/${lkSeller(o)}" target="_blank">${esc(s.name)}</a><p class="c2">г. ${esc(s.city)}</p>${S.flags.minus ? '<p class="c2">Контакты скрыты: баланс ниже нуля</p>' : `<button class="btn secondary block" data-act="soon" data-text="Контакт продавца открывается в Телеграме или ВК">Написать продавцу</button>`}</section>
-          ${manage ? `<section class="card stack-8 lk-order-actions" aria-label="Действия с заказом">${manage}</section>` : ''}
+          <section class="card lk-order-total"><div class="sum-row"><span class="c2">Товары</span><span class="v">${fmt(lkSum(o))}</span></div><div class="sum-row"><span class="c2">Доставка</span><span class="v">${delivery ? fmt(delivery) : 'бесплатно'}</span></div>${appliedOrderDiscounts(o)}${lkFee(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(lkFee(o))}</span></div>` : ''}<div class="sum-total"><span>Итого</span><span class="v">${fmt(lkTotal(o))}</span></div>${main}</section>
+          <section class="card lk-order-seller"><div class="lk-order-seller-info"><h2 class="h3">Продавец</h2><a class="link" href="#/reviews/${lkSeller(o)}" target="_blank">${esc(s.name)}</a><p class="c2">г. ${esc(s.city)}</p></div>${S.flags.minus ? '<p class="c2">Контакты скрыты: баланс ниже нуля</p>' : `<button class="btn secondary block" data-act="soon" data-text="Контакт продавца открывается в Телеграме или ВК">Написать продавцу</button>`}</section>
+          ${manage ? `<section class="card lk-order-actions" aria-label="Действия с заказом">${manage}</section>` : ''}
         </aside>
       </div>`);
   }
   function lkCard(o) {
-    const n = lkNext(o); const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const first = byId(o.lines[0].id); const url = `#/lk/order/${o.no}`;
+    const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const first = byId(o.lines[0].id); const url = `#/lk/order/${o.no}`;
     const count = o.lines.reduce((a, l) => a + l.qty, 0);
     return `<article class="ord ord-c card" id="o${o.no}">
       <header class="ord-hd"><div><a class="h3 ord-no" href="${url}">Заказ №${o.no}</a><p class="c2">${esc(s.name)}</p></div><span class="ost ${st.c}">${st.t}</span></header>
       <a class="ord-it" href="${url}"><img src="${first.img}" alt=""><span class="ord-t">${esc(first.title)}${o.lines.length > 1 ? ` и ещё ${o.lines.length - 1}` : ''}<span class="c2 ord-q">${count} шт.</span></span><span class="sb ord-p">${fmt(lkSum(o))}</span></a>
-      <div class="ord-next ${st.c} ${n.d ? 'has-d' : ''}"><p class="sb">${esc(n.h)}</p>${n.d ? `<p>${esc(n.d)}</p>` : ''}</div>
+      <div class="ord-next ${st.c}"><p>${esc(lkCardNote(o))}</p></div>
       <div class="ord-ft">${lkMainAct(o).replace('lg block', '')}<a class="btn secondary" href="${url}">Подробнее</a></div>
     </article>`;
   }
@@ -1627,7 +1645,7 @@
   function pageLk(r) {
     if (r.id === 'auctions') return isAuth() ? pageLkBids() : lkGuest('Войдите, чтобы увидеть свои торги');
     if (r.id === 'order') return isAuth() ? pageLkOrder(r.sub) : lkGuest('Войдите, чтобы открыть заказ');
-    return isAuth() ? pageLkOrders() : lkGuest('Войдите, чтобы увидеть заказы');
+    return isAuth() ? pageLkOrders() : lkGuest('Войдите, чтобы увидеть заказы', 'Покупки');
   }
 
   /* ---------- Слои ЛК ---------- */
@@ -1649,7 +1667,7 @@
     if (m.pay) {
       const o = lkGet(m.pay); const s = SELLERS[lkSeller(o)];
       const row = (k, v, copy) => `<div class="req"><span class="c2">${k}</span><span class="req-v sb">${esc(v)}</span><button class="lk-copy" aria-label="Скопировать: ${esc(k)}" data-act="copy" data-v="${esc(copy || v)}"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div>`;
-      return wrap(`Оплата заказа №${o.no}`, `<div class="note warn">${ic('alert')}<div class="body">Оплатите до ${esc(atH(o.left))}, иначе заказ отменится</div></div>
+      return wrap(`Оплата заказа №${o.no}`, `<div class="note warn">${ic('alert')}<div class="body">Оплатите до ${esc(lkDeadline(o))}, иначе заказ отменится</div></div>
         <div class="reqs">${row('Сумма', fmt(lkTotal(o)), String(lkTotal(o)))}${row('Номер карты', '2200 1234 5678 9012')}${row('Получатель', `${s.name}, Иван П.`)}</div>
         ${rcBlock()}`, `<button class="btn primary lg block ${ui.rcBusy ? 'is-loading' : ''}" data-act="rcSend">${ui.rcBusy ? '<span class="spin"></span>' : 'Отправить чек'}</button>`);
     }
@@ -1678,7 +1696,7 @@
     }
     if (m.mail) {
       const sent = ui.mailSent;
-      return wrap('Подтвердите почту', `<p class="c2">Для ставки нужна подтверждённая почта. ${sent ? 'Мы отправили код на ivanov@example.com' : 'Отправим код на ivanov@example.com'}</p>${sent ? `<label class="fld ${ui.mailErr ? 'err' : ''}"><span class="lbl">Код из письма</span><input class="inp" id="mailCode" aria-invalid="${!!ui.mailErr}" inputmode="numeric" value="${esc(ui.mailValue || '')}" placeholder="1234"></label>${ui.mailErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.mailErr)}</span></p>` : ''}<button class="linkbtn" data-act="soon" data-text="Код отправлен ещё раз">Отправить код ещё раз</button>` : ''}`, sent ? `<button class="btn primary lg block" data-act="mailDo">Подтвердить и продолжить</button>` : `<button class="btn primary lg block" data-act="mailSend">Отправить код</button>`);
+      return wrap('Подтвердите почту', `<p class="c2">Для ставки нужна подтверждённая почта. ${sent ? 'Мы отправили код на ivanov@example.com' : 'Отправим код на ivanov@example.com'}</p>${sent ? `<label class="fld ${ui.mailErr ? 'err' : ''}"><span class="lbl">Код из письма</span><input class="inp" id="mailCode" aria-invalid="${!!ui.mailErr}" inputmode="numeric" value="${esc(ui.mailValue || '')}" placeholder="ХХХХ"></label>${ui.mailErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.mailErr)}</span></p>` : ''}<button class="linkbtn" data-act="soon" data-text="Код отправлен ещё раз">Отправить код ещё раз</button>` : ''}`, sent ? `<button class="btn primary lg block" data-act="mailDo">Подтвердить и продолжить</button>` : `<button class="btn primary lg block" data-act="mailSend">Отправить код</button>`);
     }
     return '';
   }
@@ -1690,8 +1708,9 @@
     const x = LOTX[a.id] || { step: 50 };
     const q = route().q;
     const saved = S.lot?.[a.id] || {};
-    const previous = (q.ended || q.mine) && LK_BIDS.find((bid) => bid.id === a.id);
-    let ls = saved;
+    const example = q.example && LK_BIDS.find((bid) => bid.id === a.id && bid.example === q.example);
+    const previous = (q.ended || q.mine) && LK_BIDS.find((bid) => bid.id === a.id && !bid.example);
+    let ls = example && (q.ended || !saved.st) ? example : saved;
     if (!ls.st && previous) ls = { st: previous.st === 'wonDemo' ? 'won' : previous.st, my: previous.my };
     // При открытии завершённых торгов сохранённая активная ставка не возвращает форму.
     if (q.ended && !['won', 'lost', 'reserve', 'ended'].includes(ls.st)) {
@@ -1701,7 +1720,7 @@
     const price = ls.price || a.price;
     const liveCount = a.bids + (ls.n || 0);
     const history = !liveCount && ls.st === 'lost' && ls.my < price ? [price, ls.my] : null;
-    const bids = ls.st === 'ended' ? 0 : history?.length ?? liveCount;
+    const bids = ls.st === 'ended' && !ls.my ? 0 : history?.length ?? liveCount;
     return { x, ls, price, bids, history, step: x.step, next: bids ? price + x.step : price, end: T0 + a.hours * 3600000, over: ['won', 'lost', 'reserve', 'ended', 'closed'].includes(ls.st) };
   }
   const isOwnLot = (a) => role() === 'seller' && a.seller === OWN_SELLER;
@@ -1726,7 +1745,7 @@
     }
     if (ls.st === 'lost') note = `<div class="note info">${ic('info')}<div class="body">Лот выиграл другой участник. Ваша ставка ${fmt(ls.my)}</div></div><a class="btn secondary lg block" href="#/catalog" data-act="tab" data-v="auc">Другие аукционы</a>`;
     if (ls.st === 'reserve') note = `<div class="note warn">${ic('alert')}<div class="body">Резерв не достигнут: лот не продан, штрафа нет. Решение за продавцом</div></div>`;
-    if (ls.st === 'ended') note = `<div class="note info">${ic('info')}<div class="body">Торги завершились без ставок</div></div>`;
+    if (ls.st === 'ended' && !ls.my) note = `<div class="note info">${ic('info')}<div class="body">Торги завершились без ставок</div></div>`;
     if (own) note = `<div class="note info">${ic('info')}<div class="body">Это ваш аукцион: ставить на него нельзя. Участников и ставки видно здесь</div></div>`;
     let form = '';
     if (!l.over && !own) {
@@ -1785,24 +1804,36 @@
   }
 
   /* ---------- ЛК: торги ---------- */
-  const LK_BIDS = [{ id: 'a-leman', st: 'lead', my: 900 }, { id: 'a-guilliman', st: 'outbid', my: 300 }, { id: 'a-redemptor', st: 'wonDemo', my: 650 }, { id: 'a-deathwatch', st: 'lost', my: 350 }];
+  const LK_BIDS = [
+    { id: 'a-leman', st: 'lead', my: 900 },
+    { id: 'a-leman', st: 'lead', my: 900, auto: 1400, example: 'auto' },
+    { id: 'a-guilliman', st: 'outbid', my: 300 },
+    { id: 'a-redemptor', st: 'wonDemo', my: 650 },
+    { id: 'a-deathwatch', st: 'lost', my: 350 },
+    { id: 'a-leman', st: 'reserve', my: 900, example: 'reserve' },
+    { id: 'a-guilliman', st: 'ended', my: 300, example: 'ended' },
+  ];
   function pageLkBids() {
     const tab = ui.bidTab || 'all'; const res = ui.bidRes || 'all';
-    const data = S.flags.noBids ? [] : LK_BIDS.map((b) => { const ls = (S.lot || {})[b.id]; return ls && ls.st ? Object.assign({}, b, { st: ls.st, my: ls.my || b.my, auto: ls.auto }) : b; });
+    const data = S.flags.noBids ? [] : LK_BIDS.map((b) => {
+      const ls = S.lot?.[b.id];
+      return !b.example && ls?.st ? { ...b, ...ls, my: ls.my || b.my } : b;
+    });
     const done = (b) => ['won', 'wonDemo', 'lost', 'reserve', 'ended'].includes(b.st);
     const win = (b) => ['won', 'wonDemo'].includes(b.st);
     const list = data.filter((b) => (tab === 'all' || (tab === 'on' ? !done(b) : done(b))) && (res === 'all' || (res === 'win' ? win(b) : done(b) && !win(b))));
     const TAG = { lead: ['ok', 'Вы лидируете'], outbid: ['act', 'Ставку перебили'], won: ['ok', 'Вы выиграли'], wonDemo: ['ok', 'Вы выиграли'], lost: ['mute', 'Лот у другого участника'], reserve: ['mute', 'Резерв не достигнут'], ended: ['mute', 'Завершён'] };
     const card = (b) => {
       const a = byAny(b.id); const l = lotInfo(a); const t = TAG[b.st] || ['wait', 'Идут торги'];
-      const url = `#/lot/${a.id}${done(b) ? '?ended=1' : '?mine=1'}`; const need = win(b) && !(S.wonDone || []).includes(b.id);
+      const url = `#/lot/${a.id}${done(b) ? '?ended=1' : '?mine=1'}${b.example ? `&example=${b.example}` : ''}`;
+      const need = win(b) && !(S.wonDone || []).includes(b.id);
       const cta = b.st === 'outbid' ? `<a class="btn primary" href="${url}">Поставить снова</a>` : need ? `<button class="btn primary" data-act="wonGo" data-id="${a.id}" data-p="${b.my}">Оформить заказ</button>` : `<a class="btn secondary" href="${url}">Открыть лот</a>`;
       return `<article class="ord card lk-bid-card"><header class="ord-hd"><div><h2 class="h3">${esc(a.title)}</h2><p class="t12 c3">${esc(SELLERS[a.seller].name)}</p></div><span class="ost ${t[0]}">${t[1]}</span></header>
-        <div class="ord-items"><a class="ord-it" href="${url}"><img src="${a.img}" alt=""><span class="bid-rows"><span><span class="c2">Ваша ставка</span> <b>${fmt(b.my)}</b></span><span><span class="c2">${done(b) ? 'Последняя ставка' : 'Текущая'}</span> <b>${fmt(l.price)}</b></span>${b.auto ? `<span><span class="c2">Автоставка</span> <b>${fmt(b.auto)}</b></span>` : ''}${done(b) ? '' : `<span><span class="c2">До конца</span> <b data-end="${l.end}"></b></span>`}${need ? '<span class="ord-need">Оформите заказ за 48 часов</span>' : ''}</span></a></div>
-        <div class="ord-ft"><span></span><div class="ord-acts">${cta}</div></div></article>`;
+        <div class="ord-items"><a class="ord-it" href="${url}"><img src="${a.img}" alt=""><span class="bid-rows"><span><span class="c2">Ваша ставка</span> <b>${fmt(b.my)}</b></span><span><span class="c2">${done(b) ? 'Последняя ставка' : 'Текущая'}</span> <b>${fmt(b.price ?? a.price)}</b></span>${b.auto ? `<span><span class="c2">Автоставка</span> <b>${fmt(b.auto)}</b></span>` : ''}${done(b) ? '' : `<span><span class="c2">До конца</span> <b data-end="${l.end}"></b></span>`}${need ? '<span class="ord-need">Оформите заказ за 48 часов</span>' : ''}</span></a></div>
+        <div class="ord-ft">${cta}</div></article>`;
     };
     return lkShell('auctions', `<h1 class="h1" style="margin-bottom:12px">Торги</h1>
-      ${data.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x bid-tabs">${[['all', 'Все'], ['on', 'Активные'], ['off', 'Завершённые']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="bidTab" data-v="${k}">${l}</button>`).join('')}</div>${dd('bidRes', res, [['all', 'Любой итог'], ['win', 'Выигранные'], ['lose', 'Проигранные']], { aria: 'Итог торгов' })}</div>
+      ${data.length ? `<div class="lk-bar lk-bid-bar"><div class="tabs-seg scroll-x bid-tabs">${[['all', 'Все'], ['on', 'Активные'], ['off', 'Завершённые']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="bidTab" data-v="${k}">${l}</button>`).join('')}</div>${dd('bidRes', res, [['all', 'Любой итог'], ['win', 'Выигранные'], ['lose', 'Проигранные']], { aria: 'Итог торгов' })}</div>
       ${list.length ? `<div class="stack-12">${list.map(card).join('')}</div>` : `<div class="empty"><p class="h3">Ничего не найдено</p><p class="c2">Выберите другой фильтр</p></div>`}`
         : `<div class="empty"><div class="ico">${ic('gavel', 28)}</div><p class="h3">Вы пока не участвовали в торгах</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши ставки и выигранные лоты</p><a class="btn primary" href="#/catalog" data-act="tab" data-v="auc">К торгам</a></div>`}`);
   }
@@ -1990,7 +2021,7 @@
       toast('Это отдельный раздел сайта');
       return;
     }
-    S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
+    S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; S.cat.tag = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
   function saveRecipient() {
     if (!ui.recipientDraft) return true;
     contactKeys.forEach(k => { ui.touched[k] = true; });
@@ -2149,10 +2180,28 @@
     view(el) { S.cat.view = el.dataset.v; save(); render(); },
     crumbs() { ui.crumbs = !ui.crumbs; render(); },
     goHome(el, ev) { ev.preventDefault(); go('#/'); },
-    tagq(el) { toast(`Выдача по тегу ${el.dataset.v}: одинаковые теги объединяем`); },
+    tagq(el) {
+      const tag = el.dataset.v;
+      if (route().name !== 'catalog') {
+        S.cat = { ...DEFCAT(), tag, view: S.cat.view };
+        ui.applied = null;
+        ui.fTip = null;
+        save();
+        go('#/catalog');
+        return;
+      }
+      S.cat.tag = S.cat.tag === tag ? '' : tag;
+      if (ui.applied) ui.applied.tag = S.cat.tag;
+      save();
+      render();
+      const buttons = [...appEl.querySelectorAll('[data-clamp="tags"] [data-act="tagq"]')];
+      const clicked = buttons.find((button) => button.dataset.v === tag);
+      const focus = clicked && (ui.clamp.tags || clicked.offsetTop === buttons[0].offsetTop) ? clicked : buttons[0];
+      focus?.focus({ preventScroll: true });
+    },
     viewedT() { ui.viewedMore = !ui.viewedMore; render(); },
     homePop() { S.cat = Object.assign(DEFCAT(), { sort: 'pop' }); save(); go('#/catalog'); },
-    resetCat() { S.cat = DEFCAT(); save(); if (ui.modal?.filters) overlay(); else render(); },
+    resetCat() { S.cat = DEFCAT(); ui.applied = null; ui.fTip = null; save(); if (ui.modal?.filters) overlay(); else render(); },
     dropF(el) {
       const a = activeFilters()[+el.dataset.i]; const c = S.cat;
       if (a.k === 'node') c.node = null; if (a.k === 'q') c.q = ''; if (a.k === 'price') { c.min = ''; c.max = ''; } if (a.k === 'city') c.city = 'Все'; if (a.k === 'country') c.country = 'Все';
@@ -2210,8 +2259,8 @@
       resetCodeEntry(); ui.codeStatus = `Код ${code} удалён`; save(); render();
       document.getElementById('discountCode').focus({ preventScroll: true });
     },
-    term(el) { S.cat.q = el.dataset.v; S.cat.node = null; closeSearch(); save(); go('#/catalog'); },
-    searchAll() { const f = [...document.querySelectorAll('[data-form=search]')].find((x) => x.offsetParent); S.cat.q = f.q.value.trim(); S.cat.node = null; closeSearch(); save(); go('#/catalog'); },
+    term(el) { S.cat.q = el.dataset.v; S.cat.node = null; S.cat.tag = ''; closeSearch(); save(); go('#/catalog'); },
+    searchAll() { const f = [...document.querySelectorAll('[data-form=search]')].find((x) => x.offsetParent); S.cat.q = f.q.value.trim(); S.cat.node = null; S.cat.tag = ''; closeSearch(); save(); go('#/catalog'); },
     submit() { if (!ui.loading) submit(); },
   };
   function setPhoto(i) { ui.photo = i; const st = document.getElementById('strip'); if (st) st.scrollTo({ left: i * st.clientWidth, behavior: 'smooth' }); }
@@ -2370,7 +2419,7 @@
     const f = ev.target;
     if (f.dataset.form === 'discount') { ev.preventDefault(); applyDiscount(); return; }
     if (f.dataset.form !== 'search') return;
-    ev.preventDefault(); S.cat.q = f.q.value.trim(); S.cat.node = null; closeSearch(); save(); go('#/catalog');
+    ev.preventDefault(); S.cat.q = f.q.value.trim(); S.cat.node = null; S.cat.tag = ''; closeSearch(); save(); go('#/catalog');
   });
   document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' && ui.modal?.checkoutError) { A.fixCheckout(); return; }

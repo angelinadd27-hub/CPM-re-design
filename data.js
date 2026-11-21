@@ -77,7 +77,7 @@
   ];
 
   const AUCTIONS = [
-    { id: 'a-leman', title: '2 Leman Russ Vostroyan alt', seller: 'igc', cat: 'Astra Militarum', top: 'Варгеймы', price: 900, bids: 10, hours: 22.1, img: auc('8/4/3/1/41_5.25397493.webp') },
+    { id: 'a-leman', title: '2 Leman Russ Vostroyan alt', seller: 'igc', cat: 'Astra Militarum', top: 'Варгеймы', price: 900, bids: 10, hours: 1.6 /* пример: последние два часа */, img: auc('8/4/3/1/41_5.25397493.webp') },
     { id: 'a-guilliman', title: 'Roboute Guilliman', seller: 'lexx', cat: 'Adeptus Astartes: Space Marines', top: 'Варгеймы', price: 350, bids: 6, hours: 31.1, img: auc('e/9/3/5/image-3223592_4.54385967.webp') },
     { id: 'a-redemptor', title: 'Primaris Redemptor Dreadnought', seller: 'lexx', cat: 'Adeptus Astartes: Space Marines', top: 'Варгеймы', price: 650, bids: 5, hours: 31.1, img: auc('7/1/3/9/image-2631499_7.36801893.webp') },
     { id: 'a-deathwatch', title: 'Deathwatch Veterans х5', seller: 'lexx', cat: 'Adeptus Astartes: Deathwatch', top: 'Варгеймы', price: 450, bids: 0, hours: 31.1, img: auc('6/6/e/6/image-3204325_3.94116498.webp') },

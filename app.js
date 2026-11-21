@@ -12,7 +12,7 @@
 
   /* Реальные описания, характеристики и фото с сайта */
   ITEMS.forEach((i) => { const d = DESC[i.id]; if (!d) return; if (d.specs.length) i.specs = d.specs; i.text = d.text; if (d.photos.length) i.photos = d.photos; });
-  AUCTIONS.forEach((a) => { const d = DESC[a.id]; a.photos = d && d.photos.length ? [a.img].concat(d.photos.slice(1, 5)) : [a.img]; a.specs = (d && d.specs) || []; });
+  AUCTIONS.forEach((a) => { const d = DESC[a.id]; if (d) a.text = d.text; a.photos = d && d.photos.length ? [a.img].concat(d.photos.slice(1, 5)) : [a.img]; a.specs = (d && d.specs) || []; });
 
   const FILTERS = [
     { k: 'orig', t: 'Оригинальность', spec: 'Оригинальность', o: ['оригинал', 'литье', '3д печать', 'скан', 'прочее'] },
@@ -32,13 +32,17 @@
   const fmt = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const plural = (n, a, b, c) => { const m = n % 100, d = n % 10; if (m > 10 && m < 20) return c; if (d === 1) return a; if (d > 1 && d < 5) return b; return c; };
-  const byId = (id) => ITEMS.find((i) => i.id === id);
-  const byAny = (id) => byId(id) || AUCTIONS.find((a) => a.id === id);
+  const byId = (id) => ITEMS.find((i) => i.id === id) || wonLot(id);
+  const ownAuction = () => { const b = ITEMS.find((i) => i.id === 'strudd'); return Object.assign({}, b, { id: 'a-own', title: 'Strudd Panzermensh, расписанная модель', price: 2500, bids: 3, hours: 30 }); }; // пример
+  const byAny = (id) => byId(id) || AUCTIONS.find((a) => a.id === id) || (id === 'a-own' ? ownAuction() : undefined);
+  function wonLot(id) { const w = S.won && S.won[id]; if (!w) return undefined; const a = AUCTIONS.find((x) => x.id === id); return Object.assign({}, a, { price: w.price, stock: 1, lot: true, specs: [], crumbs: [] }); }
+  function winLot(id, price) { S.won = S.won || {}; S.won[id] = { price, end: Date.now() + 47.9 * 3600000 }; if (!S.cart.some((c) => c.id === id)) S.cart.push({ id, qty: 1, on: true }); }
   const spec = (o, k) => { const r = (o.specs || []).find((x) => x[0] === k); return r ? r[1] : ''; };
   const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const dateStr = (d) => `${d.getDate()} ${MONTHS[d.getMonth()]}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
   const PATHS = {
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
     cart: '<path d="M2 3h3l1 3m0 0h15l-2 9H8L6 6Z"/><circle cx="9.5" cy="20" r="1.5"/><circle cx="17.5" cy="20" r="1.5"/>',
     heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
@@ -84,20 +88,45 @@
   }
 
   /* ---------- Состояние ---------- */
-  const DEFCAT = () => ({ tab: 'all', node: null, sort: 'new', per: 24, q: '', min: '', max: '', country: 'Все', city: 'Все', f: {}, closed: {}, view: 'two' });
+  const DEFCAT = () => ({ tab: 'all', node: null, sort: 'new', per: 24, q: '', min: '', max: '', country: 'Все', city: 'Все', f: {}, view: 'two' });
   const DEF = () => ({
     cart: [], favs: [], viewed: [], lang: 'RUS', cur: 'RUB',
     form: {}, co: { city: '', cityTxt: '', dl: {}, pay: {}, pvz: {}, comment: {}, promo: {} },
-    flags: { emailExists: false, autoConfirm: false, fail: 'none', itemOut: false, partial: false, minSum: false, soldOut: false, auth: false },
-    comments: {},
+    flags: { emailExists: false, autoConfirm: false, fail: 'none', itemOut: false, partial: false, minSum: false, soldOut: false, role: 'guest' },
+    comments: {}, vars: {},
     cat: DEFCAT(), orders: null, banner: null, notice: null,
   });
   let S = DEF();
   try { const raw = sessionStorage.getItem(KEY); if (raw) { S = Object.assign(DEF(), JSON.parse(raw)); S.cat = Object.assign(DEFCAT(), S.cat); } } catch (e) { /* без хранилища работаем из памяти */ }
   const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* пропускаем */ } };
 
-  const ui = { menu: false, l1: 0, l2: null, mmMore: {}, drawer: false, dr: [], filters: false, modal: null, photo: 0, tab: 'desc', descOpen: false, lb: null, toast: null, opened: {}, cityOpen: false, touched: {}, submitted: false, loading: false, qty: 1, promoErr: {}, tagsOpen: false, relOff: {}, homeTab: 'Все', footOpen: {}, clamp: {}, crumbs: false, revSort: 'new', coStep: 1, certOpen: false, certErr: '' };
+  const ui = { menu: false, l1: 0, l2: null, mmMore: {}, drawer: false, dr: [], modal: null, photo: 0, tab: 'desc', descOpen: false, lb: null, toast: null, opened: {}, cityOpen: false, touched: {}, submitted: false, loading: false, qty: 1, promoErr: {}, tagsOpen: false, relOff: {}, homeTab: 'Все', footOpen: {}, clamp: {}, crumbs: false, revSort: 'new', coStep: 1, certOpen: false, certErr: '' };
   let toastT = null;
+
+  /* ---------- Варианты: места сомнений из обсуждений, переключаются в панели ---------- */
+  const VDEF = { adv: 'direct', cats: 'two', city: 'on', plaques: 'off', stock: 'num', sellerBox: 'short', recs: 'on', safe: 'cart', timer: 'price', filters: 'btn', how: 'on', sellerGoods: '2', clubs: '3', logic: 'now' };
+  const V = (k) => (S.vars || {})[k] || VDEF[k];
+
+  /* ---------- Безопасная сделка: комиссия примерная ---------- */
+  PAYWAY.safe = { title: 'Безопасная сделка', note: 'Деньги у нас, пока вы не получите заказ. Комиссия 5%', icon: 'shield' };
+  const SAFE_FEE = 0.05;
+  const sellerSafe = (s) => !!(s.safe || s.pro) && V('safe') !== 'off';
+  const safeFee = (sum) => Math.ceil(sum * SAFE_FEE);
+
+  /* ---------- Роли: вход и отношение к лоту. Роль определяется по лоту, а не по аккаунту ---------- */
+  const OWN_SELLER = 'pocket';
+  const role = () => S.flags.role || 'guest';
+  const isAuth = () => role() !== 'guest';
+  const isOwn = (it) => role() === 'seller' && !!it && it.seller === OWN_SELLER;
+  const myName = () => (role() === 'seller' ? SELLERS[OWN_SELLER].name : 'User1');
+  function setRole(r) {
+    S.flags.role = r; ui.replyTo = null;
+    if (r === 'guest') { S.favs = []; S.form = {}; S.lot = {}; S.lotDemo = 'live'; S.cart = S.cart.filter((c) => !(S.won && S.won[c.id])); S.won = {}; }
+    if (r === 'seller') {
+      S.cart = S.cart.filter((c) => !isOwn(byId(c.id)));
+      S.favs = S.favs.filter((id) => !isOwn(byAny(id)));
+    }
+  }
 
   /* ---------- Корзина ---------- */
   const cartCount = () => S.cart.reduce((a, c) => a + c.qty, 0);
@@ -135,7 +164,7 @@
     S.co.city = S.co.cityTxt = 'Москва';
     groups(true).forEach((g) => {
       const d = g.seller.deliveries.includes('post') ? 'post' : g.seller.deliveries.includes('tk') ? 'tk' : g.seller.deliveries[0];
-      S.co.dl[g.sid] = d; S.co.pay[g.sid] = 'card';
+      S.co.dl[g.sid] = d; if (S.co.pay[g.sid] !== 'safe') S.co.pay[g.sid] = 'card';
       if (DELIVERY[d].needs === 'pvz') S.co.pvz[g.sid] = PVZ[0].id;
     });
   }
@@ -146,7 +175,7 @@
     const [path, qs] = h.split('?');
     const parts = path.split('/').filter(Boolean);
     const q = {}; (qs || '').split('&').filter(Boolean).forEach((p) => { const [k, v] = p.split('='); q[k] = decodeURIComponent(v || ''); });
-    return { name: parts[0] || 'home', id: parts[1], q };
+    return { name: parts[0] || 'home', id: parts[1], sub: parts[2], q };
   }
   const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
 
@@ -165,11 +194,16 @@
   const DD = {
     sort(v) { S.cat.sort = v; },
     per(v) { S.cat.per = +v; },
-    country(v) { S.cat.country = v; },
-    city(v) { S.cat.city = v; },
+    country(v) { pend('.cat-side [data-dd=country]'); S.cat.country = v; },
+    city(v) { pend('.cat-side [data-dd=city]'); S.cat.city = v; },
+    lkSt(v) { ui.lkF = Object.assign({}, ui.lkF, { st: v }); },
+    lkPay(v) { ui.lkF = Object.assign({}, ui.lkF, { pay: v }); },
+    lkDl(v) { ui.lkF = Object.assign({}, ui.lkF, { dl: v }); },
+    lkSort(v) { ui.lkF = Object.assign({}, ui.lkF, { sort: v }); },
     lang(v) { S.lang = v; toast('Смена языка в прототипе только показывается'); },
     cur(v) { S.cur = v; toast('Смена валюты в прототипе только показывается'); },
     rev(v) { ui.revSort = v; },
+    bidRes(v) { ui.bidRes = v; },
   };
   const closeDD = () => document.querySelectorAll('.dd-menu:not([hidden])').forEach((m) => { m.hidden = true; const b = m.parentNode.querySelector('[data-dd-toggle]'); if (b) b.setAttribute('aria-expanded', 'false'); });
 
@@ -179,6 +213,7 @@
   const searchForm = () => `<form class="hdr-search" data-form="search" role="search" autocomplete="off">
       <input name="q" type="search" placeholder=" " value="${esc(S.cat.q)}" aria-label="Поиск">
       <button type="submit" class="hdr-search-go" aria-label="Найти">${ic('search')}</button>
+      <button type="button" class="hdr-search-x" data-act="searchClear" aria-label="Очистить">${ic('x', 18)}</button><button type="submit" class="hdr-search-do">Найти</button>
     </form>`;
 
   function header(r) {
@@ -186,9 +221,9 @@
     const badge = (v) => (v ? `<span class="badge-n">${v}</span>` : '');
     const soon = (t) => `data-act="soon" data-text="${t}"`;
     const icons = (extra) => `<a class="hdr-link" href="#/" ${soon('Продажа это отдельный сценарий, соберём его позже')} aria-label="Продать">${ic('price', 24)}<span>Продать</span></a>
-            <a class="hdr-link" href="#/" ${soon('Страницу избранного соберём позже, сердечки уже работают')} aria-label="Избранное">${ic('heart', 24)}<span>Избранное</span>${badge(f)}</a>
+            <a class="hdr-link" href="#/" ${isAuth() ? soon('Страницу избранного соберём позже, сердечки уже работают') : 'data-act="loginFor" data-text="Войдите, чтобы открыть избранное"'} aria-label="Избранное">${ic('heart', 24)}<span>Избранное</span>${badge(f)}</a>
             <a class="hdr-link" href="#/cart" aria-label="Корзина">${ic('cart', 24)}<span>Корзина</span>${badge(n)}</a>
-            <button class="hdr-link" data-act="login" aria-label="Войти">${ic('user', 24)}<span>${S.flags.auth ? 'Профиль' : 'Войти'}</span></button>${extra || ''}`;
+            <button class="hdr-link" data-act="${isAuth() ? 'profile' : 'login'}" aria-label="${isAuth() ? 'Профиль' : 'Войти'}">${ic('user', 24)}<span>${isAuth() ? 'Профиль' : 'Войти'}</span>${isAuth() ? badge(wonNeed()) : ''}</button>${extra || ''}`;
     return `<div class="hdr-m1 hide-t-up"><div class="wrap hdr-m1-row"><div class="brand">${logoHtml()}</div><nav class="hdr-act" aria-label="Действия">${icons()}</nav></div></div>
       <div class="hdr-top hide-below-d"><div class="wrap hdr-top-row">
         <div class="row hdr-top-l">
@@ -249,7 +284,7 @@
   function spCard(it) {
     const c = inCart(it.id);
     return `<article class="sp-c"><a href="#/item/${it.id}"><img src="${it.img}" alt=""><span class="sp-pr">${fmt(it.price)}</span><span class="sp-ct">${esc(it.title)}</span></a>
-      ${c ? qtyStep(it, c, 'sm') : `<button type="button" class="btn primary sm" data-act="addc" data-id="${it.id}">В корзину</button>`}</article>`;
+      ${isOwn(it) ? ownEdit('secondary sm') : c ? qtyStep(it, c, 'sm') : `<button type="button" class="btn primary sm" data-act="addc" data-id="${it.id}">В корзину</button>`}</article>`;
   }
   function spHtml(q) {
     const v = q.trim().toLowerCase();
@@ -324,26 +359,29 @@
   /* ---------- Карточки в списках ---------- */
   const cardList = (id) => { const o = byAny(id); return (o.photos && o.photos.length ? [o.img].concat(o.photos.slice(1)) : [o.img]).slice(0, 5); };
   const swap = (o) => { const n = cardList(o.id).length; return { attr: n > 1 ? `data-swap="${o.id}"` : '', dots: n > 1 ? `<span class="pc-dots">${Array.from({ length: n }, (_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</span>` : '' }; };
-  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}<span class="pc-city">, г. ${esc(s.city)}</span></span>`;
-  const revCount = (n) => `<span class="pc-rev" aria-label="${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}">${ic('chat', 14)}<span>${n}</span></span>`;
+  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}${V('city') === 'on' ? `<span class="pc-city">, г. ${esc(s.city)}</span>` : ''}</span>`;
+  const revCount = (n) => `<span class="pc-rev" aria-label="${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}">${ic('chat', 14)}<span>${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}</span></span>`;
   const sellerRate = (s) => (s.reviews ? `<span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span>` : '<span class="pc-rate"><span>Новый продавец</span></span>');
-  const badgeList = (it) => { const v = SELLERS[it.seller]; const b = []; if (v.freeFrom) b.push(`Бесплатная доставка от ${fmt(v.freeFrom)}`); if (v.safe) b.push('Безопасная сделка'); return b; };
+  const badgeList = (it) => { const v = SELLERS[it.seller]; const b = []; if (v.freeFrom) b.push({ k: 'free', i: 'truck', t: `Бесплатная доставка от ${fmt(v.freeFrom)}`, s: `0 ₽ от ${fmt(v.freeFrom)}` }); if (sellerSafe(v)) b.push({ k: 'safe', i: 'shield', t: 'Безопасная сделка', s: 'Безопасная сделка' }); return b; };
+  const bdgTag = (b) => `<span class="bdg ${b.k}">${ic(b.i, 14)}<span class="bdg-l">${b.t}</span><span class="bdg-s">${b.s}</span></span>`;
   /* 25. Количество появляется вместо кнопки, при нуле кнопка возвращается */
   const qtyStep = (it, c, cls) => `<div class="step ${cls}" aria-label="Количество"><button data-act="cartQty" data-id="${it.id}" data-d="-1" aria-label="Меньше">${ic('minus', 16)}</button><input class="step-i" inputmode="numeric" aria-label="Количество" data-lineqty="${it.id}" value="${c.qty}"><button data-act="cartQty" data-id="${it.id}" data-d="1" ${c.qty >= it.stock ? 'disabled' : ''} aria-label="Больше">${ic('plus', 16)}</button></div>`;
+  const ownEdit = (cls) => `<button type="button" class="btn ${cls}" data-act="soon" data-text="Редактирование объявления это блок продажи, соберём его отдельно"><span>Редактировать</span></button>`;
   const heart = (id, fav) => `<button class="pc-heart ${fav ? 'fav-on' : ''}" data-act="fav" data-id="${id}" aria-label="В избранное" aria-pressed="${fav}">${ic('heart', 20)}</button>`;
   function pcard(it, mini) {
     const s = SELLERS[it.seller]; const fav = S.favs.includes(it.id); const g = swap(it); const c = inCart(it.id);
     return `<article class="pc">
       <div class="pc-media" ${g.attr}>
         <a href="#/item/${it.id}" class="pc-img"><img loading="lazy" src="${it.img}" alt="${esc(it.title)}"></a>
+        ${V('plaques') === 'on' && badgeList(it).length ? `<span class="pc-plaques">${badgeList(it).map(bdgTag).join('')}</span>` : ''}
         ${g.dots}
       </div>
       <div class="pc-body">
         <div class="pc-buy">
           <a href="#/item/${it.id}" class="pc-price">${fmt(it.price)}</a>
           <div class="pc-btns">
-            ${heart(it.id, fav)}
-            ${c ? qtyStep(it, c, 'sm pc-step') : `<button class="btn primary sm pc-add" data-act="addc" data-id="${it.id}" aria-label="В корзину">${ic('cart', 16)}<span>В корзину</span></button>`}
+            ${isOwn(it) ? ownEdit('secondary sm pc-add pc-own') : `${heart(it.id, fav)}
+            ${c ? qtyStep(it, c, 'sm pc-step') : `<button class="btn primary sm pc-add" data-act="addc" data-id="${it.id}" aria-label="В корзину">${ic('cart', 16)}<span>В корзину</span></button>`}`}
           </div>
         </div>
         <a href="#/item/${it.id}" class="pc-link">
@@ -357,19 +395,18 @@
   function acard(a) {
     const s = SELLERS[a.seller]; const fav = S.favs.includes(a.id); const g = swap(a);
     const end = T0 + a.hours * 3600000; const urgent = end - Date.now() <= URGENT_MS;
-    const soon = 'data-act="soon" data-text="Лот и ставка это сценарий аукциона, соберём его следующим"';
     return `<article class="pc">
       <div class="pc-media" ${g.attr}>
-        <a href="#/" ${soon} class="pc-img"><img loading="lazy" src="${a.img}" alt="${esc(a.title)}"></a>
+        <a href="#/lot/${a.id}" class="pc-img"><img loading="lazy" src="${a.img}" alt="${esc(a.title)}"></a>
         <span class="pc-timer ${urgent ? 'urgent' : ''}"><span class="tip down" data-tip="Аукцион" tabindex="0">${ic('gavel', 16)}</span><span data-end="${end}"></span></span>
         ${g.dots}
       </div>
       <div class="pc-body">
         <div class="pc-buy">
-          <a href="#/" ${soon} class="pc-price">${fmt(a.price)}</a>
-          <div class="pc-btns">${heart(a.id, fav)}<button class="btn primary sm pc-add wide" ${soon}><span class="lab-long">Сделать ставку</span><span class="lab-short">Ставка</span></button></div>
+          <a href="#/lot/${a.id}" class="pc-price">${fmt(lotInfo(a).price)}</a>
+          <div class="pc-btns">${heart(a.id, fav)}<a class="btn primary sm pc-add wide" href="#/lot/${a.id}"><span class="lab-long">Сделать ставку</span><span class="lab-short">Ставка</span></a></div>
         </div>
-        <a href="#/" ${soon} class="pc-link">
+        <a href="#/lot/${a.id}" class="pc-link">
           <span class="pc-sub">${a.bids ? `${a.bids} ${plural(a.bids, 'ставка', 'ставки', 'ставок')}` : 'Ставок пока нет'}</span>
           <span class="pc-title">${esc(a.title)}</span>
           ${sellerName(s)}${sellerRate(s)}
@@ -402,15 +439,16 @@
   function pageHome() {
     const hits = { Все: ['strudd', 'darkshroud', 'prisoners', 'yucatan', 'trukk', 'zeratul', 'skorpekh', 'brutalis'], Варгеймы: ['trukk', 'zeratul', 'warriors', 'skorpekh', 'lutazy', 'terminators', 'brutalis', 'darkshroud'], 'Ролевые игры': ['strudd', 'assassins', 'prisoners'], 'Настольные игры': ['yucatan', 'arkham', 'zombicide'] };
     const popular = ITEMS.filter((i) => !hits['Все'].includes(i.id)).slice(0, 4);
-    const sellers = [['pocket', ['strudd', 'assassins']], ['lexx', ['a-redemptor', 'a-deathwatch']], ['krsk', ['arkham', 'zombicide']], ['wolf', ['terminators', 'brutalis']]];
-    const events = HOME.events.slice(0, 3);
-    const clubs = HOME.clubs.slice(0, 3);
+    const more = V('sellerGoods') === '4';
+    const sellers = [['pocket', more ? ['strudd', 'assassins', 'prisoners', 'strudd'] : ['strudd', 'assassins']], ['lexx', more ? ['a-redemptor', 'a-deathwatch', 'a-guilliman', 'a-redemptor'] : ['a-redemptor', 'a-deathwatch']], ['krsk', more ? ['arkham', 'zombicide', 'arkham', 'zombicide'] : ['arkham', 'zombicide']], ['wolf', more ? ['terminators', 'brutalis', 'terminators', 'brutalis'] : ['terminators', 'brutalis']]];
+    const events = HOME.events.slice(0, +V('clubs'));
+    const clubs = HOME.clubs.slice(0, +V('clubs'));
     const soon = (t) => `data-act="soon" data-text="${t}"`;
     return `<h1 class="vh">Свободный Рынок Миниатюр: маркет миниатюр, настольных и карточных игр</h1>
       <section class="adv"><div class="wrap adv-in">
         <div class="adv-i">${ic('shield', 24)}<span><b>Работаем с 2018 года</b><span>маркет сообщества</span></span></div>
         <div class="adv-i">${ic('user', 24)}<span><b>60\u00a0000+ человек в месяц</b><span>покупают и продают на СРМ</span></span></div>
-        <div class="adv-i hide-m-only">${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span></div>
+        <div class="adv-i hide-m-only">${V('adv') === 'safe' ? `${ic('shield', 24)}<span><b>Безопасная сделка</b><span>деньги у нас, пока не получите заказ</span></span>` : `${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span>`}</div>
       </div></section>
       <section class="band first"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Текущие аукционы</h2><a class="link row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 14)}</a></div>
@@ -418,14 +456,14 @@
       </div></section>
       <section class="band white"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Популярные категории</h2><a class="link row-l" href="#/catalog" data-act="node" data-top="" data-v="">Все категории ${ic('right', 14)}</a></div>
-        <div class="tiles">${HOME.cats.map((c) => `<a class="tile" href="#/catalog" data-act="nodeq" data-v="${esc(c.t)}"><img loading="lazy" src="${c.img}" alt=""><span>${esc(c.t)}</span></a>`).join('')}</div>
+        <div class="tiles ${V('cats') === 'one' ? 'one' : ''}">${HOME.cats.map((c) => `<a class="tile" href="#/catalog" data-act="nodeq" data-v="${esc(c.t)}"><img loading="lazy" src="${c.img}" alt=""><span>${esc(c.t)}</span></a>`).join('')}</div>
       </div></section>
 
 
       <section class="band"><div class="wrap">
         <div class="sec-hd wrap-hd"><h2 class="sec-t">Новые объявления</h2>
           <div class="tabs-seg scroll-x">${Object.keys(hits).map((k) => `<button class="${ui.homeTab === k ? 'on' : ''}" data-act="homeTab" data-v="${k}">${k}</button>`).join('')}</div></div>
-        <div class="grid">${hits[ui.homeTab].map((id) => pcard(byId(id))).join('')}</div>
+        <div class="grid">${hits[ui.homeTab].slice(0, 4).map((id) => pcard(byId(id))).join('')}</div>
         <div class="center"><a class="btn secondary lg" href="#/catalog" data-act="node" data-top="" data-v="">Посмотреть все объявления</a></div>
       </div></section>
 
@@ -433,7 +471,7 @@
         <div class="sec-hd"><h2 class="sec-t">Популярные объявления</h2><a class="link row-l" href="#/catalog" data-act="homePop">Посмотреть все ${ic('right', 14)}</a></div>
         <div class="grid">${popular.map((x) => pcard(x)).join('')}</div>
       </div></section>
-      ${howBlock('band white')}
+      ${V('how') === 'on' ? howBlock('band white') : ''}
 
       <section class="band"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Продавцы с лучшими отзывами</h2><a class="link row-l" href="#/" ${soon('Раздел «Продавцы» соберём отдельным блоком')}>Все продавцы ${ic('right', 14)}</a></div>
@@ -454,8 +492,8 @@
   }
 
   /* ---------- Каталог ---------- */
-  function catalogList() {
-    const c = S.cat; const q = c.q.trim().toLowerCase();
+  function catalogList(src) {
+    const c = src || S.cat; const q = c.q.trim().toLowerCase();
     let list = [];
     if (c.tab !== 'auc') list = list.concat(ITEMS.map((i) => ({ t: 'i', o: i })));
     if (c.tab !== 'goods') list = list.concat(AUCTIONS.map((a) => ({ t: 'a', o: a })));
@@ -474,8 +512,8 @@
     if (c.sort === 'old') list.reverse();
     return list;
   }
-  function activeFilters() {
-    const c = S.cat; const o = [];
+  function activeFilters(src) {
+    const c = src || S.cat; const o = [];
     if (c.node) o.push({ l: c.node, k: 'node' });
     if (c.q) o.push({ l: `Поиск: ${c.q}`, k: 'q' });
     if (c.min || c.max) o.push({ l: `Цена ${c.min ? 'от ' + c.min : ''} ${c.max ? 'до ' + c.max : ''}`.trim(), k: 'price' });
@@ -485,9 +523,17 @@
     return o;
   }
   const fOn = (k) => { const c = S.cat; if (k === 'cat') return !!c.node; if (k === 'price') return !!(c.min || c.max); if (k === 'geo') return c.city !== 'Все' || c.country !== 'Все'; return !!(c.f[k] && c.f[k].length); };
-  const FCLOSED = ['geo'].concat(FILTERS.map((f) => f.k));
-  const fClosed = (k) => (k in S.cat.closed ? S.cat.closed[k] : FCLOSED.includes(k));
-  const fsec = (k, title, body) => { const off = fClosed(k); return `<div class="flt"><button class="flt-t ${fOn(k) ? 'on' : ''}" data-act="fltT" data-k="${k}" aria-expanded="${!off}">${ic(off ? 'right' : 'down', 16)}${title}</button>${off ? '' : `<div class="flt-b">${body}</div>`}</div>`; };
+  /* Фильтры раскрыты: так ими чаще пользуются. Без фасетного индекса результат показываем по кнопке */
+  const filterBtn = () => V('filters') === 'btn' && window.innerWidth >= 1024;
+  function pend(sel) { if (!filterBtn()) return; if (!ui.applied) ui.applied = JSON.parse(JSON.stringify(S.cat)); ui.fTip = sel; }
+  function placeTip() {
+    const t = document.getElementById('fltTip'); if (!t) return;
+    const a = ui.fTip && document.querySelector(ui.fTip); if (!a) { t.hidden = true; return; }
+    const box = a.closest('label') || a; const r = box.getBoundingClientRect(); const side = document.querySelector('.cat-side').getBoundingClientRect();
+    const hide = r.top < side.top - 4 || r.bottom > side.bottom + 4;
+    t.hidden = hide; t.style.top = `${Math.round(r.top + r.height / 2 - t.offsetHeight / 2)}px`; t.style.left = `${Math.round(side.right + 12)}px`;
+  }
+  const fsec = (k, title, body) => `<section class="flt" data-filter-group="${k}"><h2 class="flt-t ${fOn(k) ? 'on' : ''}">${title}</h2><div class="flt-b">${body}</div></section>`;
   const chks = (g, opts) => `<div class="stack-4">${opts.map((t) => `<label class="chk"><input type="checkbox" data-act-chg="flt" data-g="${g}" value="${esc(t)}" ${(S.cat.f[g] || []).includes(t) ? 'checked' : ''}><span class="box">${ic('check', 14)}</span><span>${esc(t)}</span></label>`).join('')}</div>`;
   /* Путь до категории: верхний раздел, подраздел, третий уровень */
   function nodePath(n) {
@@ -559,7 +605,6 @@
       b.hidden = !(ui.clamp[el.dataset.clamp] || el.scrollHeight > el.clientHeight + 2);
     });
   }
-  const perDd = (noPrefix) => dd('per', S.cat.per, [[24, '24'], [48, '48'], [96, '96']], { aria: 'Сколько выводить на странице', prefix: noPrefix ? '' : 'Выводить по ' });
   function nodeCrumbs(n) {
     const p = nodePath(n); if (!n) return [];
     if (!p) return [{ t: n }];
@@ -567,22 +612,22 @@
     return chain.map((t, i) => (i === chain.length - 1 ? { t } : { t, a: `data-act="nodef" data-v="${esc(t)}"` }));
   }
   function pageCatalog() {
-    const c = S.cat; const list = catalogList(); const act = activeFilters();
-    const shown = list.slice(0, c.per);
+    const c = S.cat; const src = ui.applied || S.cat; const list = catalogList(src); const act = activeFilters(src);
+    const shown = list;
     return `<div class="wrap page">
       ${crumbs([HOME_C, CAT_C].concat(nodeCrumbs(c.node)))}
       <div class="between" style="margin-bottom:12px"><h1 class="h1">${c.q ? `Поиск: ${esc(c.q)}` : esc(c.node || 'Каталог')}</h1>${list.length ? `<span class="c3 cat-count">${list.length} ${plural(list.length, 'объявление', 'объявления', 'объявлений')}</span>` : ''}</div>
       ${clampRow('tags', TAGS.map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join(''), 'one')}
       <div class="cat-layout">
+        ${ui.fTip && ui.applied ? `<div class="flt-tip" id="fltTip"><button class="btn primary sm" data-act="fltApply">Показать ${catalogList().length}</button></div>` : ''}
         <aside class="cat-side" aria-label="Фильтры">${filtersHtml()}<div class="flt-act"><button class="btn ghost sm" data-act="resetCat">Сбросить</button><button class="btn secondary sm" data-act="saveSearch">${ic('save', 16)}Сохранить поиск</button></div></aside>
         <div>
           <div class="cat-bar">
             <div class="tabs-seg cat-tabs" role="tablist">${[['all', 'Все'], ['goods', 'Товары'], ['auc', 'Аукционы']].map(([k, l]) => `<button role="tab" aria-selected="${c.tab === k}" class="${c.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${l}</button>`).join('')}</div>
-            ${act.length ? '' : `<button class="btn hide-d cat-flt" data-act="filters">${ic('filter', 16)}Фильтры</button>`}
             <div class="view-tg hide-t-up" role="group" aria-label="Вид выдачи"><button class="${c.view === 'two' ? 'on' : ''}" data-act="view" data-v="two" aria-label="По две карточки в ряд" aria-pressed="${c.view === 'two'}">${ic('grid', 20)}</button><button class="${c.view === 'one' ? 'on' : ''}" data-act="view" data-v="one" aria-label="Список, по одной в ряд" aria-pressed="${c.view === 'one'}">${ic('list', 20)}</button></div>
-            <div class="sp-auto row hide-m-only">${perDd()}${dd('sort', c.sort, SORTS, { aria: 'Сортировка' })}</div>
+            <div class="sp-auto row catalog-sort">${dd('sort', c.sort, SORTS, { aria: 'Сортировка' })}</div>
           </div>
-          ${act.length ? `<div class="act-f"><button class="af-filter hide-d" data-act="filters" aria-label="Фильтры, применено ${act.length}">${ic('filter', 18)}<span class="badge-n">${act.length}</span></button>${act.map((a, i) => `<span class="chip plain af"><button data-act="fEdit" data-i="${i}">${esc(a.l)}</button><button class="af-x" data-act="dropF" data-i="${i}" aria-label="Убрать фильтр">${ic('x', 14)}</button></span>`).join('')}<button class="linkbtn" data-act="resetCat">Сбросить все</button></div>` : ''}
+          ${act.length ? `<div class="act-f">${act.map((a, i) => `<span class="chip plain af"><button data-act="fEdit" data-i="${i}">${esc(a.l)}</button><button class="af-x" data-act="dropF" data-i="${i}" aria-label="Убрать фильтр">${ic('x', 14)}</button></span>`).join('')}<button class="linkbtn" data-act="resetCat">Сбросить все</button></div>` : ''}
           ${shown.length ? `<div class="grid g3 ${c.view === 'one' ? 'as-list' : ''}">${shown.map((x) => (x.t === 'i' ? pcard(x.o) : acard(x.o))).join('')}</div>`
             : `<div class="empty"><div class="ico">${ic('search', 28)}</div><p class="h3">По вашему запросу ничего не найдено</p><p class="c2" style="margin:4px 0 16px">Попробуйте другой запрос или снимите фильтры</p><button class="btn secondary" data-act="resetCat">Сбросить фильтры</button></div>`}
         </div>
@@ -606,6 +651,7 @@
   function sellerCard(it) {
     const s = SELLERS[it.seller];
     const reviewsTxt = s.reviews ? `${s.reviews} ${plural(s.reviews, 'отзыв', 'отзыва', 'отзывов')}` : 'Отзывов пока нет';
+    const own = isOwn(it); const subd = (S.subs || []).includes(it.seller); const blkd = (S.blks || []).includes(it.seller);
     const page = 'data-act="soon" data-text="Страницу продавца соберём отдельным блоком"';
     return `<section class="card seller" aria-label="Продавец">
       <div class="seller-hd">
@@ -619,30 +665,35 @@
         <div><dt>На площадке</dt><dd>${esc(s.stazh)}</dd></div>
         <div><dt>Срок отправки</dt><dd>до ${esc(s.shipWait)}</dd></div>
         <div><dt>Вероятность задержки</dt><dd>${s.late}%</dd></div>
+        ${V('sellerBox') === 'full' && ui.sellerMore ? `<div><dt>Подписчики</dt><dd>13</dd></div><div><dt>Выполнено заказов</dt><dd>${s.done || 231}</dd></div><div><dt>Сделано покупок</dt><dd>115</dd></div><div><dt>Срок ожидания оплаты</dt><dd>${esc(s.payWait)}</dd></div>` : ''}
       </dl>
+      ${V('sellerBox') === 'full' ? `<button class="linkbtn" data-act="sellerMore">${ui.sellerMore ? 'Свернуть' : 'Показать всё'} ${ic(ui.sellerMore ? 'up' : 'down', 16)}</button>` : ''}
       <div class="seller-act">
-        <button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы подписаться: новые объявления продавца будут приходить в уведомления">${ic('bell', 24)}<span>Подписаться</span></button>
+        ${own ? '' : isAuth() ? `<button class="seller-l ${subd ? 'on' : ''}" data-act="sub" data-id="${it.seller}" aria-pressed="${subd}">${ic('bell', 24)}<span>${subd ? 'Вы подписаны' : 'Подписаться'}</span></button>` : `<button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы подписаться: новые объявления продавца будут приходить в уведомления">${ic('bell', 24)}<span>Подписаться</span></button>`}
         <a class="seller-l" href="#/" ${page}>${ic('grid', 24)}<span>Все товары</span></a>
-        <button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы заблокировать продавца: его объявления перестанут вам показываться">${ic('block', 24)}<span>Заблокировать</span></button>
+        ${own ? '' : isAuth() ? `<button class="seller-l ${blkd ? 'on' : ''}" data-act="blk" data-id="${it.seller}" aria-pressed="${blkd}">${ic('block', 24)}<span>${blkd ? 'Заблокирован' : 'Заблокировать'}</span></button>` : `<button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы заблокировать продавца: его объявления перестанут вам показываться">${ic('block', 24)}<span>Заблокировать</span></button>`}
       </div>
     </section>`;
   }
+  const stockTxt = (it) => (V('stock') === 'num' ? `В наличии: ${it.stock} шт.` : 'В наличии');
   const favBtn = (it, fav) => `<button class="icon-btn line lg ${fav ? 'fav-on' : ''}" data-act="fav" data-id="${it.id}" aria-label="В избранное" aria-pressed="${fav}">${ic('heart', 22)}</button>`;
   function buyBlock(it) {
     const s = SELLERS[it.seller]; const out = S.flags.soldOut; const c = inCart(it.id); const fav = S.favs.includes(it.id);
     const dl = s.deliveries.map((d) => DELIVERY[d].title).join(', ');
-    const pay = s.pay.map((p) => PAYWAY[p].title.replace('\u00a0', ' ')).join(', ');
+    const pay = s.pay.filter((p) => p !== 'cash' || s.deliveries.includes('pickup')).map((p) => (p === 'cash' ? 'наличными при\u00a0самовывозе' : PAYWAY[p].title.replace('\u00a0', ' '))).join(', ');
     return `<div class="buy-top">
         <a class="c3 t12" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">${esc(it.cat)}</a>
         <h1 class="pdp-title">${esc(it.title)}</h1>
       </div>
+      ${isOwn(it) ? `<div class="note info">${ic('info')}<div class="body">Это ваше объявление: покупатели видят здесь кнопку покупки</div></div>` : ''}
       <div class="buy-price">
         <div class="price-big">${fmt(it.price)}</div>
-        ${out ? `<span class="stock no">${ic('x', 16)}Нет в наличии</span>` : `<span class="stock">${ic('check', 16)}В наличии: ${it.stock} шт.</span>`}
-        ${badgeList(it).length ? `<div class="buy-badges">${badgeList(it).map((t) => `<span>${t}</span>`).join('')}</div>` : ''}
+        ${out ? `<span class="stock no">${ic('x', 16)}Нет в наличии</span>` : `<span class="stock">${ic('check', 16)}${stockTxt(it)}</span>`}
+        ${badgeList(it).length ? `<div class="buy-badges">${badgeList(it).map(bdgTag).join('')}</div>` : ''}
       </div>
       <div class="hide-m-cta">
-        ${out ? `<div class="buy-cta"><a class="btn secondary lg" href="#/catalog">Похожие товары</a>${favBtn(it, fav)}</div>`
+        ${isOwn(it) ? `<div class="buy-cta">${ownEdit('secondary lg')}</div>`
+          : out ? `<div class="buy-cta"><a class="btn secondary lg" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">Похожие товары</a>${favBtn(it, fav)}</div>`
           : `<div class="buy-cta">
             ${c ? `${qtyStep(it, c, 'lg')}<a class="btn incart lg" href="#/cart">Перейти в корзину</a>` : `<button class="btn primary lg" data-act="add" data-id="${it.id}">Добавить в корзину</button>`}
             ${favBtn(it, fav)}
@@ -685,7 +736,9 @@
     { who: 'User51234', date: '02 ноября 2026', text: 'Подскажите, база идёт в комплекте или её нужно докупать отдельно?', replies: [{ who: 'PocketSized Prints', seller: true, date: '02 ноября 2026', text: 'База в комплекте, миниатюра с базой на 32 мм.' }, { who: 'User51234', date: '03 ноября 2026', text: 'Спасибо!' }] },
     { who: 'GriinWan', date: '28 октября 2026', text: 'Можно напечатать в другом масштабе?', replies: [{ who: 'PocketSized Prints', seller: true, date: '28 октября 2026', text: 'Да, напишите в комментарии к заказу, какой масштаб нужен.' }] },
   ];
-  const cmItem = (c, i, reply) => `<article class="cm ${reply ? 'reply' : ''}"><span class="ava sm">${esc(c.who[0])}</span><div><div class="row"><span class="sb">${esc(c.who)}</span>${c.seller ? '<span class="tag mute">Продавец</span>' : ''}<span class="t12 c3">${esc(c.date)}</span></div><p>${esc(c.text)}</p>${!reply && S.flags.auth ? `<button class="linkbtn t12" data-act="replyT" data-i="${i}">Ответить</button>` : ''}</div></article>`;
+  const LOT_COMMENTS = [{ who: 'User51234', date: '05 ноября 2026', text: 'Подскажите, доставка до Москвы возможна?', replies: [{ who: 'Продавец', seller: true, date: '05 ноября 2026', text: 'Да, отправлю СДЭК или Яндекс Доставкой.' }] }]; // пример
+  const cmList = (id) => S.comments[id] || (id === 'strudd' ? COMMENTS : (AUCTIONS.some((a) => a.id === id) ? LOT_COMMENTS : []));
+  const cmItem = (c, i, reply) => `<article class="cm ${reply ? 'reply' : ''}"><span class="ava sm">${esc(c.who[0])}</span><div><div class="row"><span class="sb">${esc(c.who)}</span>${c.seller ? '<span class="tag mute">Продавец</span>' : ''}<span class="t12 c3">${esc(c.date)}</span></div><p>${esc(c.text)}</p>${!reply && isAuth() ? `<button class="linkbtn t12" data-act="replyT" data-i="${i}">Ответить</button>` : ''}</div></article>`;
   /* Разбивка по звёздам примерная: на сайте хранятся средний балл и число положительных и отрицательных */
   function starDist(s) {
     const n = s.reviews; const one = Math.ceil(s.neg * 0.7); const two = s.neg - one; const rest = n - s.neg;
@@ -705,7 +758,7 @@
     if (ui.revSort === 'bad') sorted.sort((a, b) => Number(a.good) - Number(b.good));
     return `${summary}
         ${revs.length > 1 ? `<div class="rev-bar">${dd('rev', ui.revSort, [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['good', 'Сначала с высокой оценкой'], ['bad', 'Сначала с низкой оценкой']], { aria: 'Сортировка отзывов' })}</div>` : ''}
-        ${sorted.map((v) => `<article class="rev"><div class="between"><span class="sb">${esc(v.who)}</span><span class="t12 c3">${esc(v.date)}</span></div><div class="rev-st" aria-label="Оценка ${v.good ? 5 : 1} из 5">${[1, 2, 3, 4, 5].map((x) => `<span class="${x <= (v.good ? 5 : 1) ? 'on' : ''}">${STAR}</span>`).join('')}</div><p>${esc(v.text)}</p></article>`).join('')}
+        ${sorted.map((v) => `<article class="rev"><div class="between"><span class="row"><span class="sb">${esc(v.who)}</span>${!v.good ? '<span class="tag mute">Заказ отменён</span>' : ''}</span><span class="t12 c3">${esc(v.date)}</span></div><div class="rev-st" aria-label="Оценка ${v.good ? 5 : 1} из 5">${[1, 2, 3, 4, 5].map((x) => `<span class="${x <= (v.good ? 5 : 1) ? 'on' : ''}">${STAR}</span>`).join('')}</div><p>${esc(v.text)}</p></article>`).join('')}
         ${more}`;
   }
   function pageSellerReviews(r) {
@@ -721,25 +774,33 @@
   function pageItem(r) {
     const it = byId(r.id) || ITEMS[0];
     const s = SELLERS[it.seller]; const revs = REVIEWS[it.seller] || [];
-    const tabs = [['desc', 'Описание'], ['talk', 'Обсуждение', 0], ['reviews', 'Отзывы о товаре', revs.length]];
+    const tabs = [['desc', 'Описание']].concat(it.specs.length ? [['specs', 'Характеристики']] : [], [['talk', 'Обсуждение', 0], ['reviews', 'Отзывы о товаре', revs.length]]);
     const similar = ITEMS.filter((i) => i.id !== it.id && i.top === it.top).slice(0, 4);
-    let tabBody = '';
+    const tabBody = itemTab(it, revs);
+    return pageItemTail(it, s, tabs, similar, tabBody);
+  }
+  function itemTab(it, revs) {
+    const own = isOwn(it) || (it.id === 'a-own'); let tabBody = '';
     if (ui.tab === 'desc') {
-      tabBody = `${(ITEM_TAGS[it.id] || []).length ? `<div class="d-tags">${ITEM_TAGS[it.id].map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join('')}</div>` : ''}
-        ${it.specs.length ? `<h2 class="h3 d-sec">Характеристики</h2><dl class="spec">${it.specs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-        <h2 class="h3 d-sec">Описание</h2>${descHtml(it)}
-        <div class="d-foot"><span class="t12 c3">Опубликовано ${esc(it.added)}</span><button class="linkbtn" style="color:var(--text-2)" data-act="report">${ic('flag', 16)}Пожаловаться на объявление</button></div>`;
+      tabBody = `${descHtml(it)}
+        ${(ITEM_TAGS[it.id] || []).length ? `<div class="d-tags">${ITEM_TAGS[it.id].map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join('')}</div>` : ''}
+        <div class="d-foot"><span class="t12 c3">${it.added ? `Опубликовано ${esc(it.added)}` : ''}</span>${isOwn(it) ? '' : `<button class="linkbtn" style="color:var(--text-2)" data-act="${isAuth() ? 'report' : 'loginFor'}"${isAuth() ? '' : ' data-text="Войдите, чтобы пожаловаться на объявление"'}>${ic('flag', 16)}Пожаловаться на объявление</button>`}</div>`;
+    } else if (ui.tab === 'specs') {
+      tabBody = `<dl class="spec">${it.specs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>`;
     } else if (ui.tab === 'talk') {
-      const list = S.comments[it.id] || (it.id === 'strudd' ? COMMENTS : []);
+      const list = cmList(it.id);
       tabBody = it.noComments ? '<p class="c2">Продавец отключил комментарии к\u00a0этому объявлению</p>' : `
         ${list.length ? `<div class="cm-list">${list.map((c, i) => `<div class="cm-thread">${cmItem(c, i)}${(c.replies || []).length || ui.replyTo === i ? `<div class="cm-replies">${(c.replies || []).map((x) => cmItem(x, i, true)).join('')}${ui.replyTo === i ? `<div class="cm-form in"><textarea class="inp" id="cmReply" rows="2" placeholder="Ваш ответ"></textarea><div class="row" style="justify-content:flex-end"><button class="btn ghost sm" data-act="replyT" data-i="${i}">Отмена</button><button class="btn primary sm" data-act="replySend" data-id="${it.id}" data-i="${i}">Ответить</button></div></div>` : ''}</div>` : ''}</div>`).join('')}</div>` : '<p class="c2" style="margin-bottom:12px">Вопросов пока нет. Спросите продавца о\u00a0комплектации, доставке или фото</p>'}
-        ${S.flags.auth ? `<div class="cm-form"><label class="fld"><span class="lbl">Ваш вопрос или комментарий</span><textarea class="inp" id="cmText" rows="3" placeholder="Например, есть ли дополнительные фото"></textarea></label><div class="between"><button class="linkbtn" data-act="soon" data-text="Прикрепление изображений как на сайте">${ic('clip', 16)}Изображения</button><button class="btn primary" data-act="comment" data-id="${it.id}">Отправить</button></div></div>`
+        ${isAuth() ? `<div class="cm-form"><label class="fld"><span class="lbl">${isOwn(it) ? 'Ваш комментарий' : 'Ваш вопрос или комментарий'}</span><textarea class="inp" id="cmText" rows="3" placeholder="${isOwn(it) ? 'Например, об уточнении к объявлению' : 'Например, есть ли дополнительные фото'}"></textarea></label><div class="between"><button class="linkbtn" data-act="soon" data-text="Прикрепление изображений как на сайте">${ic('clip', 16)}Изображения</button><button class="btn primary" data-act="comment" data-id="${it.id}">Отправить</button></div></div>`
           : `<div class="note info">${ic('info')}<div class="body">Чтобы задать вопрос, войдите в\u00a0аккаунт. <button class="linkbtn" data-act="login">Войти</button></div></div>`}`;
     } else {
       const neg = revs.filter((v) => !v.good).length;
       const avg = revs.reduce((n, v) => n + (v.good ? 5 : 1), 0) / (revs.length || 1);
       tabBody = revs.length ? reviewsBody(revs, revSummary({ rating: avg, reviews: revs.length, neg }), '') : '<p class="c2">Отзывов о\u00a0товаре пока нет</p>';
     }
+    return tabBody;
+  }
+  function pageItemTail(it, s, tabs, similar, tabBody) {
     return `<div class="wrap page">
       ${crumbs([HOME_C, CAT_C].concat(it.crumbs.map((c) => ({ t: c, a: `data-act="nodeq" data-v="${esc(c)}"` }))))}
       <div class="pdp">
@@ -753,7 +814,8 @@
           <div class="tab-body" id="tabs">${tabBody}</div>
         </div>
       </div>
-      ${similar.length ? `<section class="sec"><div class="sec-hd"><h2 class="h2">Похожие товары</h2></div><div class="scroller">${similar.map((x) => pcard(x)).join('')}</div></section>` : ''}
+      ${similar.length ? `<section class="sec"><div class="sec-hd"><h2 class="h2">Похожие товары</h2><a class="link row-l" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">Все в категории ${ic('right', 14)}</a></div><div class="scroller">${similar.map((x) => pcard(x)).join('')}</div></section>` : ''}
+      ${recsBlock([it.id].concat(similar.map((x) => x.id)), 'Специально для вас')}
     </div>`;
   }
 
@@ -766,16 +828,17 @@
       <label class="chk" style="padding-top:2px"><input type="checkbox" data-act-chg="line" data-id="${it.id}" ${l.on && !out ? 'checked' : ''} ${out ? 'disabled' : ''} aria-label="Включить в заказ"><span class="box">${ic('check', 14)}</span></label>
       <a class="ci-img" href="#/item/${it.id}"><img src="${it.img}" alt=""></a>
       <div class="ci-mid">
-        <a class="ci-t" href="#/item/${it.id}">${esc(it.title)}</a>
+        <a class="ci-t" href="#/${it.lot ? 'lot' : 'item'}/${it.id}">${esc(it.title)}</a>
         <p class="t12 c3">${esc(it.cat)}</p>
+        ${it.lot ? `<p class="ci-lot">${ic('gavel', 14)}<span>Выигранный лот, оформите за <b data-end="${S.won[it.id].end}"></b></span></p>` : ''}
         ${out ? `<div class="err-t">${ic('alert', 14)}<span>${rest < 1 ? 'Товар закончился' : `В наличии только ${rest} шт.`}</span></div>` : ''}
         ${out && rest > 0 ? `<button class="linkbtn t12" style="margin-top:4px" data-act="fixQty" data-id="${it.id}" data-v="${rest}">Оставить ${rest} шт.</button>` : ''}
       </div>
       <div class="ci-ctl">
         <span class="ci-price">${fmt(it.price * l.qty)}</span>
         <div class="row">
-          ${stepper ? `<div class="step sm"><button data-act="lineQty" data-id="${it.id}" data-d="-1" ${l.qty <= 1 ? 'disabled' : ''} aria-label="Меньше">${ic('minus', 16)}</button><input class="step-i" inputmode="numeric" aria-label="Количество" data-lineqty="${it.id}" value="${l.qty}"><button data-act="lineQty" data-id="${it.id}" data-d="1" ${l.qty >= it.stock ? 'disabled' : ''} aria-label="Больше">${ic('plus', 16)}</button></div>` : `<span class="t12 c3">${l.qty} шт.</span>`}
-          <button class="icon-btn" style="width:32px;height:32px" data-act="rm" data-id="${it.id}" aria-label="Удалить">${ic('trash', 18)}</button>
+          ${stepper && !it.lot ? `<div class="step sm"><button data-act="lineQty" data-id="${it.id}" data-d="-1" ${l.qty <= 1 ? 'disabled' : ''} aria-label="Меньше">${ic('minus', 16)}</button><input class="step-i" inputmode="numeric" aria-label="Количество" data-lineqty="${it.id}" value="${l.qty}"><button data-act="lineQty" data-id="${it.id}" data-d="1" ${l.qty >= it.stock ? 'disabled' : ''} aria-label="Больше">${ic('plus', 16)}</button></div>` : `<span class="t12 c3">${l.qty} шт.</span>`}
+          <button class="icon-btn" style="width:32px;height:32px" ${it.lot ? `data-act="cfm" data-k="dropLot" data-id="${it.id}"` : `data-act="rm" data-id="${it.id}"`} aria-label="Удалить">${ic('trash', 18)}</button>
         </div>
       </div>
     </div>`;
@@ -796,9 +859,10 @@
     const open = ui.viewedMore;
     return `<section class="sec"><div class="sec-hd"><h2 class="h2">Вы смотрели</h2></div><div class="${open ? 'grid' : 'scroller'}">${ids.slice(0, open ? 8 : 4).map((id) => pcard(byId(id))).join('')}</div>${ids.length > 4 ? `<div class="sec-more"><button class="btn secondary" data-act="viewedT">${open ? 'Свернуть' : 'Показать ещё'}</button></div>` : ''}</section>`;
   }
-  function recsBlock(exclude) {
+  function recsBlock(exclude, title) {
+    if (V('recs') === 'off') return '';
     const ids = REC_IDS.filter((id) => !exclude.includes(id) && !S.viewed.slice(0, 4).includes(id)).slice(0, 4);
-    return `<section class="sec"><div class="sec-hd"><h2 class="h2">Может понравиться</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
+    return `<section class="sec"><div class="sec-hd"><h2 class="h2">${title || 'Может понравиться'}</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
   }
   function cartCta(blocked, anyOut, minBad) {
     if (!blocked) return '<a class="btn primary lg block hide-sm" href="#/checkout">Перейти к оформлению</a>';
@@ -812,7 +876,10 @@
         <div class="empty"><div class="ico">${ic('cart', 28)}</div><p class="h3">В корзине пока пусто</p><p class="c2" style="margin:4px 0 16px">Найдите нужное в каталоге или через поиск</p><a class="btn primary" href="#/catalog">Перейти в каталог</a></div>
         ${viewedBlock([])}</div>`;
     }
-    const total = on.reduce((a, g) => a + g.sum, 0);
+    const cartFee = (g) => (S.co.pay[g.sid] === 'safe' && V('safe') !== 'off' ? safeFee(g.sum) : 0);
+    const fees = on.reduce((a, g) => a + cartFee(g), 0);
+    const safeQty = on.filter(cartFee).reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
+    const total = on.reduce((a, g) => a + g.sum, 0) + fees;
     const count = on.reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
     const anyOut = S.cart.some(isOut); const minBad = on.some(minProblem);
     const blocked = !count || anyOut || minBad;
@@ -833,11 +900,11 @@
             return `<section class="sg">
               <header class="sg-hd"><span class="sb">${esc(g.seller.name)}</span>${g.seller.pro ? '<span class="tag pro">PRO</span>' : ''}<span class="row t12 c2" style="gap:4px">${g.seller.reviews ? `${STAR}${g.seller.rating.toFixed(2)}` : 'Новый продавец'}</span><span class="t12 c3">${esc(g.seller.city)}</span></header>
               ${g.lines.map(cartLine).join('')}
-              <div class="sg-ft">
+              ${need || free ? `<div class="sg-ft">
                 ${need ? `<div class="note warn" role="status">${ic('alert')}<div class="body">Минимальная сумма заказа у продавца ${fmt(g.seller.minSum)}. Доберите товаров на ${fmt(need)}</div></div>` : ''}
                 ${free && !need ? `<div class="note ok">${ic('truck')}<div class="body">${gOn && gOn.sum >= free ? 'Бесплатная доставка!' : `Добавьте товаров на ${fmt(free - (gOn ? gOn.sum : 0))}, чтобы получить бесплатную доставку`}</div></div>` : ''}
-                <div class="between"><span class="c2">Итого у продавца, без доставки</span><span class="sb">${fmt(gOn ? gOn.sum : 0)}</span></div>
-              </div>
+              </div>` : ''}
+              ${V('safe') === 'cart' && sellerSafe(g.seller) ? `<label class="safe-row"><span class="safe-ic">${ic('shield', 20)}</span><span class="safe-t"><b>Безопасная сделка</b><span class="t12 c2">Деньги у нас, пока вы не получите заказ. Комиссия 5%: ${fmt(safeFee(gOn ? gOn.sum : 0))}</span></span><span class="sw"><input type="checkbox" data-act-chg="safe" data-s="${g.sid}" ${S.co.pay[g.sid] === 'safe' ? 'checked' : ''} aria-label="Безопасная сделка"><i></i></span></label>` : ''}
               ${relatedBlock(g)}
             </section>`;
           }).join('')}
@@ -846,8 +913,8 @@
           <div class="h3">Ваш заказ</div>
           ${on.length > 1 ? `<div class="note info">${ic('info')}<div class="body"><b>Будет ${on.length} ${plural(on.length, 'заказ', 'заказа', 'заказов')}.</b> У каждого продавца своё подтверждение, оплата и доставка</div></div>` : ''}
           ${on.map((g) => `<div class="sum-row"><span class="c2">${esc(g.seller.name)}</span><span class="v">${fmt(g.sum)}</span></div>`).join('')}
-          <div class="sum-row"><span class="c2">Доставка</span><span class="v c2">на следующем шаге</span></div>
-          <div class="sum-total"><span>Итого за товары</span><span class="v">${fmt(total)}</span></div>
+          ${fees ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${safeQty}</span><span class="v">${fmt(fees)}</span></div>` : ''}<div class="sum-row"><span class="c2">Доставка</span><span class="v c2">на следующем шаге</span></div>
+          <div class="sum-total"><span>Итого за товары</span><span class="v">${fmt(total)}</span></div>
           ${cartCta(blocked, anyOut, minBad)}
         </aside>
       </div>
@@ -895,7 +962,8 @@
     return DELIVERY[d].price + (S.co.surcharge && S.co.surcharge[g.sid] ? S.co.surcharge[g.sid] : 0);
   };
   const promoOff = (g) => (S.co.promo[g.sid] === 'MINI10' ? Math.round(g.sum * 0.1) : 0);
-  const orderTotal = (g) => g.sum - promoOff(g) + (dlPrice(g) || 0);
+  const coFee = (g) => (S.co.pay[g.sid] === 'safe' && V('safe') !== 'off' ? safeFee(g.sum) : 0);
+  const orderTotal = (g) => g.sum - promoOff(g) + (dlPrice(g) || 0) + coFee(g);
   const certOff = (sum) => (S.co.cert === 'GIFT500' ? Math.min(500, sum) : 0);
   const grand = () => { const v = coGroups().reduce((a, g) => a + orderTotal(g), 0); return v - certOff(v); };
 
@@ -949,7 +1017,8 @@
   }
   function payBlock(g, i, n) {
     const s = g.seller; const co = S.co; const dl = co.dl[g.sid];
-    const payOpts = s.pay.filter((p) => p !== 'cash' || dl === 'pickup');
+    const canPay = (p) => p !== 'cash' || dl === 'pickup';
+    const payOpts = s.pay.concat(sellerSafe(s) ? ['safe'] : []).filter(canPay);
     const pay = payOpts.includes(co.pay[g.sid]) ? co.pay[g.sid] : payOpts[0];
     co.pay[g.sid] = pay;
     const openC = ui.opened['c' + g.sid]; const openP = ui.opened['p' + g.sid];
@@ -984,7 +1053,7 @@
         ${n > 1 ? `<div class="sb">${esc(g.seller.name)}</div>` : ''}
         <div class="sum-row"><span class="c2">Товары, ${g.lines.reduce((a, l) => a + l.qty, 0)} шт.</span><span class="v">${fmt(g.sum)}</span></div>
         ${promoOff(g) ? `<div class="sum-row"><span class="c2">Скидка</span><span class="v">−${fmt(promoOff(g))}</span></div>` : ''}
-        <div class="sum-row"><span class="c2">Доставка</span><span class="v ${p === null ? 'c3' : ''}">${p === null ? 'не выбрана' : p === 0 ? 'бесплатно' : fmt(p)}</span></div>
+        <div class="sum-row"><span class="c2">Доставка</span><span class="v ${p === null ? 'c3' : ''}">${p === null ? 'не выбрана' : p === 0 ? 'бесплатно' : fmt(p)}</span></div>${coFee(g) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${g.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(coFee(g))}</span></div>` : ''}
       </div>`; }).join('')}
       ${certBlock()}
       <div class="sum-total" style="padding-top:0;border-top:0"><span>Итого</span><span class="v">${fmt(grand())}</span></div>
@@ -998,6 +1067,7 @@
   function pageCheckout() {
     const gs = coGroups();
     if (!gs.length) { setTimeout(() => go('#/cart'), 0); return ''; }
+    if (isAuth() && !S.form.email) Object.assign(S.form, { email: 'ivanov@example.com', phone: '+7 (900) 123-45-67', fio: 'Иванов Иван Иванович' });
     const cityErr = (ui.submitted || ui.touched.city) && !S.co.city;
     const st = ui.coStep; const names = ['Получатель', 'Доставка', 'Оплата', 'Проверка'];
     const mobileBtn = st < 4 ? '<button class="btn primary lg" data-act="coNext">Далее</button>' : `<button class="btn primary lg ${ui.loading ? 'is-loading' : ''}" data-act="submit">${ui.loading ? '<span class="spin"></span>' : ctaText(gs.length)}</button>`;
@@ -1011,7 +1081,7 @@
       <div class="two co">
         <div>
           <div class="key st st-3 hide-d" style="margin-bottom:12px;background:var(--surface)">${ic('card')}<div><p class="sb">Сейчас платить не нужно</p><p>Реквизиты получите, когда продавец подтвердит заказ</p></div></div>
-          <div class="guest-bar st st-1"><span class="c2">Оформляете как гость. Аккаунт создадим автоматически</span><span>Уже есть аккаунт? <button class="linkbtn" data-act="login">Войти</button></span></div>
+          ${isAuth() ? '' : '<div class="guest-bar st st-1"><span class="c2">Оформляете как гость. Аккаунт создадим автоматически</span><span>Уже есть аккаунт? <button class="linkbtn" data-act="login">Войти</button></span></div>'}
           <section class="co-sec st st-1" aria-labelledby="s1"><div class="co-hd"><span class="n">1</span><h2 class="h3" id="s1">Получатель</h2></div>
             <p class="co-sub">Заказ выдадут по этим данным, проверьте их</p>
             <div class="form-grid">${field('fio')}${field('email', 'col3')}${field('phone', 'col3')}</div>
@@ -1089,9 +1159,10 @@
   function makeOrders() {
     const d48 = new Date(Date.now() + 48 * 3600000);
     S.orders = coGroups().map((g, i) => ({
-      no: 464801 + i, sid: g.sid, dl: S.co.dl[g.sid], pay: S.co.pay[g.sid], pvz: S.co.pvz[g.sid], sum: g.sum, delivery: dlPrice(g) || 0, total: orderTotal(g) - (i === 0 ? certOff(coGroups().reduce((a, x) => a + orderTotal(x), 0)) : 0), deadline: d48.getTime(),
+      no: 464801 + i, sid: g.sid, dl: S.co.dl[g.sid], pay: S.co.pay[g.sid], pvz: S.co.pvz[g.sid], sum: g.sum, delivery: dlPrice(g) || 0, fee: coFee(g), total: orderTotal(g) - (i === 0 ? certOff(coGroups().reduce((a, x) => a + orderTotal(x), 0)) : 0), deadline: d48.getTime(),
       lines: g.lines.map((l) => ({ id: l.id, qty: l.qty })),
     }));
+    S.wonDone = (S.wonDone || []).concat(coGroups().reduce((a, g) => a.concat(g.lines.filter((l) => l.item.lot).map((l) => l.id)), []));
     S.buyer = { email: S.form.email || 'ivanov@example.com', name: (S.form.fio || 'Иванов Иван').trim().split(/\s+/)[1] || 'Иван' };
   }
   function ensureOrders() {
@@ -1103,13 +1174,13 @@
   /* ---------- Успех ---------- */
   const isConfirmed = (o) => S.flags.autoConfirm && SELLERS[o.sid].pro;
   function timeline(o, confirmed, email, multi) {
-    const s = SELLERS[o.sid]; const cash = o.pay === 'cash'; const pickup = o.dl === 'pickup';
+    const s = SELLERS[o.sid]; const cash = o.pay === 'cash'; const safe = o.pay === 'safe'; const pickup = o.dl === 'pickup';
     const dl = dateStr(new Date(o.deadline));
     const steps = [
       confirmed ? { t: 'Продавец подтвердил заказ', d: 'Автоматически, сразу после оформления' } : { t: multi ? 'Продавцы подтвердят заказы' : 'Продавец подтвердит заказ', d: `До ${dl}. Если продавец не ответит за 48 часов, заказ отменится автоматически` },
-      multi ? { t: 'Вы оплатите каждый заказ отдельно', d: `Реквизиты и срок оплаты придут на ${email} после подтверждения. Если не успеть, заказ отменится` } : cash ? { t: 'Оплатите наличными при встрече', d: 'Договоритесь с продавцом о месте и времени' } : { t: 'Вы оплатите переводом и приложите чек', d: `Реквизиты придут на ${email}. На оплату будет ${s.payWait}, если не успеть, заказ отменится` },
+      multi ? { t: 'Вы оплатите каждый заказ отдельно', d: `Реквизиты и срок оплаты придут на ${email} после подтверждения. Если не успеть, заказ отменится` } : safe ? { t: 'Оплатите заказ онлайн', d: 'Деньги останутся у нас, пока вы не получите заказ' } : cash ? { t: 'Оплатите наличными при встрече', d: 'Договоритесь с продавцом о месте и времени' } : { t: 'Вы оплатите переводом и приложите чек', d: `Реквизиты придут на ${email}. На оплату будет ${s.payWait}, если не успеть, заказ отменится` },
       multi ? { t: 'Продавцы отправят заказы', d: 'У каждого свой срок отправки, он указан в письме и в заказе' } : pickup ? { t: 'Заберёте заказ у продавца', d: `${s.city}` } : { t: 'Продавец отправит заказ', d: `В течение ${s.shipWait} после оплаты` },
-      { t: 'Подтвердите получение', d: 'Через 30 дней заказ сам считается полученным' },
+      { t: 'Подтвердите получение', d: safe ? 'После этого продавец получит деньги' : 'Через 30 дней заказ сам считается полученным' },
     ];
     const cur = confirmed ? 1 : 0;
     return `<ol class="tl">${steps.map((x, i) => `<li class="${i < cur ? 'done' : i === cur ? 'now' : ''}"><span class="d">${i < cur ? ic('check', 14) : i + 1}</span><div><p class="tl-t">${esc(x.t)}</p><p class="tl-d">${esc(x.d)}</p></div></li>`).join('')}</ol>`;
@@ -1149,42 +1220,333 @@
       ${multi ? `<div class="note info">${ic('info')}<div class="body">Это ${os.length} отдельных заказа: у каждого продавца своё подтверждение, оплата и доставка</div></div>` : ''}
       <section class="card">
         <h2 class="h3" style="margin-bottom:16px">Что будет дальше</h2>${timeline(os[0], allConf, S.buyer.email, multi)}
-        <div class="tg-box"><img src="assets/tg.svg" alt="" width="40" height="40"><div><h3 class="h3">Статус заказа в\u00a0Телеграме</h3><p class="c2">Подключите уведомления, и бот сообщит, когда продавец ответит</p></div><button class="btn secondary" data-act="soon" data-text="Подключение Телеграма оставляем как на сайте">Получать уведомления</button></div>
+        <div class="tg-box sub-box"><div><h3 class="h3">Следите за заказом</h3><p class="c2">Подключите уведомления, и мы сообщим, когда продавец ответит</p></div><div class="row"><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте"><img src="assets/vk-logo.svg" alt="" width="20" height="20">ВКонтакте</button><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте"><img src="assets/tg.svg" alt="" width="20" height="20">Телеграм</button></div></div>
       </section>
-      ${accountBlock()}
+      ${isAuth() ? `<section class="card stack-8"><h2 class="h3">Контакт для связи</h2><p class="c2">Продавец сможет написать вам, если появятся вопросы по заказу</p><div class="row contact-row"><input class="inp" id="contactI" placeholder="Телеграм или ВК" aria-label="Контакт для связи"><button class="btn secondary" data-act="contactSave">Сохранить</button></div></section>` : accountBlock()}
       ${os.map(orderCard).join('')}
       <div class="acts">
-        <button class="btn primary lg" data-act="soon" data-text="Вход и заказ в личном кабинете это следующий сценарий: CJM 2 «После заказа»">${allConf ? 'Войти и оплатить' : 'Войти и открыть заказ'}</button>
+        <button class="btn primary lg" ${isAuth() ? 'data-act="toLk"' : 'data-act="loginFor" data-text="Войдите, чтобы открыть заказ"'}>${isAuth() ? (allConf ? 'Оплатить заказ' : 'Открыть заказ') : (allConf ? 'Войти и оплатить' : 'Войти и открыть заказ')}</button>
         <a class="btn secondary lg" href="#/catalog">Продолжить покупки</a>
       </div>
     </div></div>`;
   }
 
-  /* ---------- Письмо ---------- */
-  function pageEmail() {
-    ensureOrders();
-    const o = S.orders[0]; const s = SELLERS[o.sid]; const ex = S.flags.emailExists; const e = S.buyer.email; const conf = isConfirmed(o);
-    return `<div class="wrap page"><div class="mail">
-      <div class="mail-meta"><p class="sb">${conf ? `Заказ №${o.no} подтверждён, можно оплатить` : `Вы оформили заказ №${o.no}`}</p><p class="t12 c3">От: Свободный Рынок Миниатюр. Кому: ${esc(e)}</p></div>
-      <div class="mail-body stack-16">
-        <img src="assets/logo.png" alt="СРМ" height="32" style="height:32px">
-        <h1 class="h2">${conf ? 'Заказ подтверждён' : 'Заказ оформлен'}</h1>
-        <p>${esc(S.buyer.name)}, ${conf ? `продавец ${esc(s.name)} подтвердил заказ. Оплатите его в течение ${esc(s.payWait)}.` : `продавец ${esc(s.name)} подтвердит заказ до ${dateStr(new Date(o.deadline))}. Платить пока не нужно: когда он ответит, пришлём письмо с реквизитами.`}</p>
-        <div class="mail-box stack-8">
-          <p class="sb">Заказ №${o.no}</p>
-          ${o.lines.map((l) => `<div class="sum-row"><span>${esc(byId(l.id).title)}, ${l.qty} шт.</span><span class="v">${fmt(byId(l.id).price * l.qty)}</span></div>`).join('')}
-          <div class="sum-row"><span>${DELIVERY[o.dl].title}</span><span class="v">${o.delivery ? fmt(o.delivery) : 'бесплатно'}</span></div>
-          <div class="sum-row sb"><span>Итого</span><span class="v">${fmt(o.total)}</span></div>
-        </div>
-        <div class="mail-box stack-4">
-          <p class="sb">${ex ? 'Заказ в вашем аккаунте' : 'Мы создали для вас аккаунт'}</p>
-          <p class="c2">${ex ? `Заказ добавлен в аккаунт ${esc(e)}. Войдите со своим паролем` : `Логин: ${esc(e)}. Пароль в письме «Регистрация». В аккаунте статус заказа, оплата и чек`}</p>
-        </div>
-        <button class="btn primary lg" data-act="soon" data-text="Кнопка ведёт на заказ в личном кабинете: следующий сценарий">${conf ? 'Оплатить заказ' : 'Открыть заказ'}</button>
-        <p class="t12 c3">Вопросы к заказу задавайте продавцу в личном кабинете</p>
-      </div>
-      <p style="margin-top:12px"><a class="link" href="#/success">Вернуться к экрану заказа</a></p>
+  /* ---------- ЛК: общая оболочка ---------- */
+  const atH = (h) => dateStr(new Date(T0 + h * 3600000));
+  const hrsLeft = (h) => (h > 48 ? `${Math.floor(h / 24)} дн. ${h % 24} ч` : `${h} ч`);
+  const wonIds = () => { const a = Object.keys(S.won || {}); if (!S.flags.noBids) a.push('a-redemptor'); return a.filter((x, i) => a.indexOf(x) === i && !(S.wonDone || []).includes(x)); };
+  const wonNeed = () => (isAuth() ? wonIds().length : 0);
+  const LK_MENU = [['orders', 'Покупки', '#/lk/orders'], ['auctions', 'Торги', '#/lk/auctions'], ['sell', 'Продажи'], ['products', 'Товары'], ['payment', 'Баланс'], ['settings', 'Настройки']];
+  function lkShell(cur, body) {
+    const item = ([k, t, href]) => (href ? `<a class="lk-l ${cur === k ? 'on' : ''}" href="${href}"><span>${t}</span>${k === 'auctions' && wonNeed() ? `<span class="badge-i">${wonNeed()}</span>` : ''}</a>` : `<button class="lk-l" data-act="soon" data-text="${k === 'settings' ? 'Поля ЛК это блок первого визита' : 'Этот раздел относится к блоку продажи'}">${t}</button>`);
+    return `<div class="wrap page"><div class="lk">
+      <aside class="lk-side" aria-label="Личный кабинет"><div class="lk-u"><span class="ava">${esc(myName()[0])}</span><span class="sb">${esc(myName())}</span></div>
+        ${S.flags.minus ? `<p class="lk-bal">Баланс: <b>−55 ₽</b></p>` : ''}
+        <nav class="lk-nav">${LK_MENU.map(item).join('')}<button class="lk-l" data-act="logout">Выход</button></nav></aside>
+      <div class="lk-main">${body}</div>
     </div></div>`;
+  }
+  const lkGuest = (t) => `<div class="wrap page"><div class="empty"><div class="ico">${ic('user', 28)}</div><p class="h3">${t}</p><p class="c2" style="margin:4px 0 16px">Если заказ оформлен без регистрации, логин и пароль пришли на вашу почту</p><button class="btn primary" data-act="login">Войти</button></div></div>`;
+
+  /* ---------- ЛК: покупки ---------- */
+  const LK_BASE = [
+    { no: 464812, st: 'approve', dl: 'yd', pay: 'card', left: 47, lines: [{ id: 'strudd', qty: 1 }] },
+    { no: 464811, st: 'pay', dl: 'post', pay: 'card', left: 70, lines: [{ id: 'zeratul', qty: 1 }] },
+    { no: 464809, st: 'pay', dl: 'pickup', pay: 'cash', left: 70, lines: [{ id: 'brutalis', qty: 1 }] },
+    { no: 464808, st: 'pay', dl: 'yd', pay: 'safe', left: 70, lines: [{ id: 'assassins', qty: 1 }] },
+    { no: 464806, st: 'paid', dl: 'cdek', pay: 'card', left: 30, lines: [{ id: 'darkshroud', qty: 1 }], receipt: 'чек-464806.pdf' },
+    { no: 464803, st: 'process', dl: 'post', pay: 'card', left: 62, lines: [{ id: 'warriors', qty: 1 }], receipt: 'чек-464803.jpg' },
+    { no: 464798, st: 'sent', dl: 'post', pay: 'card', left: 120, lines: [{ id: 'trukk', qty: 1 }], track: '80080012345678', receipt: 'чек-464798.png' },
+    { no: 464790, st: 'got', dl: 'yd', pay: 'card', lines: [{ id: 'prisoners', qty: 2 }], track: 'YD102938475', receipt: 'чек-464790.pdf' },
+    { no: 464781, st: 'dispute', dl: 'post', pay: 'card', stop: 5, lines: [{ id: 'arkham', qty: 1 }], track: '80080098765432', receipt: 'чек-464781.pdf', by: 'buyer' },
+    { no: 464774, st: 'cancel', dl: 'post', pay: 'card', stop: 3, wasProcess: true, why: 'Продавец не отправил заказ в срок', lines: [{ id: 'yucatan', qty: 1 }] },
+    { no: 464760, st: 'cancel', dl: 'pickup', pay: 'cash', stop: 1, why: 'Продавец не ответил за 48 часов', lines: [{ id: 'lutazy', qty: 1 }] },
+  ];
+  const newOrders = () => (S.orders || []).map((o) => ({ no: o.no, st: isConfirmed(o) ? (o.pay === 'cash' ? 'process' : 'pay') : 'approve', dl: o.dl, pay: o.pay, left: isConfirmed(o) ? 72 : 48, lines: o.lines, fee: o.fee }));
+  const lkOrders = () => (S.flags.noOrders ? [] : newOrders().concat(LK_BASE).map((o) => Object.assign({}, o, (S.lkO || {})[o.no])));
+  const lkGet = (no) => lkOrders().find((o) => o.no === +no);
+  const lkPatch = (no, p) => { S.lkO = S.lkO || {}; S.lkO[no] = Object.assign({}, S.lkO[no], p); save(); };
+  const lkSeller = (o) => byId(o.lines[0].id).seller;
+  const lkSum = (o) => o.lines.reduce((a, l) => a + byId(l.id).price * l.qty, 0);
+  const lkFee = (o) => (o.pay === 'safe' ? (o.fee || safeFee(lkSum(o))) : 0);
+  const lkTotal = (o) => lkSum(o) + DELIVERY[o.dl].price + lkFee(o);
+  const OST = {
+    approve: { t: 'Ожидает подтверждения', c: 'wait' }, pay: { t: 'Ожидает оплату', c: 'act' }, paid: { t: 'Произведена оплата', c: 'wait' }, process: { t: 'В обработке', c: 'wait' },
+    sent: { t: 'Отправлен', c: 'act' }, got: { t: 'Получен', c: 'ok' }, dispute: { t: 'Спор', c: 'bad' }, cancel: { t: 'Отменён', c: 'mute' },
+  };
+  function lkNext(o) {
+    const s = SELLERS[lkSeller(o)];
+    const d = (h) => `${atH(h)}, осталось ${hrsLeft(h)}`;
+    if (o.st === 'approve') return { h: 'Ждём ответ продавца', p: 'Он проверит наличие и стоимость доставки. Платить пока не нужно. Если не ответит, заказ отменится', d: `Ответ до ${d(o.left)}` };
+    if (o.st === 'pay' && o.pay === 'cash') return { h: 'Оплата при встрече', p: `Договоритесь с ${s.name} о месте и времени. Чек загружать не нужно`, d: `Встреча до ${d(o.left)}` };
+    if (o.st === 'pay' && o.pay === 'safe') return { h: 'Оплатите заказ онлайн', p: 'Деньги останутся у нас и перейдут продавцу, когда вы подтвердите получение', d: `Оплатить до ${d(o.left)}` };
+    if (o.st === 'paid' && o.pay === 'safe') return { h: 'Деньги у сервиса', p: 'Продавец готовит заказ. Он получит деньги, когда вы подтвердите получение', d: `Отправка до ${d(o.left)}` };
+    if (o.st === 'pay') return { h: 'Оплатите заказ', p: 'Переведите сумму продавцу и приложите чек. Если не успеть, заказ отменится', d: `Оплатить до ${d(o.left)}` };
+    if (o.st === 'paid') return { h: 'Продавец проверяет оплату', p: 'Если он не ответит, через 48 часов заказ сам перейдёт в обработку', d: `Проверка до ${d(o.left)}` };
+    if (o.st === 'process') return { h: 'Продавец готовит заказ', p: 'Когда он отправит посылку, здесь появится трек-номер', d: `Отправка до ${d(o.left)}` };
+    if (o.st === 'sent') return { h: 'Заказ в пути', p: 'Когда получите, подтвердите получение. Если что-то не так, сначала откройте спор: после подтверждения его не открыть', d: `Спор можно открыть до ${d(o.left)}` };
+    if (o.st === 'got') return o.review ? { h: 'Спасибо за отзыв', p: 'Он появился на странице продавца' } : { h: 'Заказ получен', p: 'Отзыв поможет другим покупателям выбрать продавца' };
+    if (o.st === 'dispute') return { h: o.by === 'buyer' ? 'Вы открыли спор' : 'Спор открыл продавец', p: 'Напишите нам на почту: укажите номер заказа и опишите причину. Деньги и посылку обсудим в переписке' };
+    return { h: 'Заказ отменён', p: o.why };
+  }
+  /* ---------- ЛК: заказ, шаги ---------- */
+  function lkTimeline(o) {
+    const cash = o.pay === 'cash'; const safe = o.pay === 'safe'; const pickup = o.dl === 'pickup';
+    const steps = [
+      { done: 'Заказ оформлен', now: 'Заказ оформлен', d: '' },
+      { done: 'Продавец подтвердил заказ', now: 'Продавец подтверждает заказ', d: 'Проверяет наличие и стоимость доставки' },
+      { done: cash ? 'Оплата при встрече' : safe ? 'Заказ оплачен онлайн' : 'Заказ оплачен', now: o.st === 'paid' ? 'Продавец проверяет оплату' : cash ? 'Договоритесь об оплате при встрече' : safe ? 'Оплатите заказ онлайн' : 'Оплатите заказ и приложите чек', d: safe ? 'Деньги останутся у нас, пока вы не получите заказ' : '' },
+      { done: pickup ? 'Заказ передан' : 'Заказ отправлен', now: pickup ? 'Продавец готовит заказ к встрече' : 'Продавец отправляет заказ', d: '' },
+      { done: 'Заказ получен', now: 'Получите заказ и подтвердите', d: safe ? 'После подтверждения продавец получит деньги' : '' },
+    ];
+    const cur = { approve: 1, pay: 2, paid: 2, process: 3, sent: 4, got: 5 }[o.st];
+    const stop = o.stop;
+    const li = (cls, n, t, d) => `<li class="${cls}"><span class="d">${cls === 'done' ? ic('check', 14) : cls === 'stop' ? ic('x', 14) : n}</span><div><p class="tl-t">${esc(t)}</p>${d ? `<p class="tl-d">${esc(d)}</p>` : ''}</div></li>`;
+    if (stop !== undefined) return `<ol class="tl">${steps.slice(0, stop).map((x, i) => li('done', i + 1, x.done, '')).join('')}${li('stop', stop + 1, o.st === 'dispute' ? 'Открыт спор' : 'Заказ отменён', o.st === 'cancel' ? o.why : '')}</ol>`;
+    return `<ol class="tl">${steps.map((x, i) => (i < cur ? li('done', i + 1, x.done, '') : i === cur ? li('now', i + 1, x.now, x.d) : li('', i + 1, x.now, ''))).join('')}</ol>`;
+  }
+  function lkMainAct(o) {
+    if (o.st === 'pay' && o.pay !== 'cash') return `<button class="btn primary lg block" data-act="payOpen" data-no="${o.no}">${o.pay === 'safe' ? `Оплатить ${fmt(lkTotal(o))}` : 'Оплатить'}</button>`;
+    if (o.st === 'sent') return `<button class="btn primary lg block" data-act="cfm" data-k="got" data-no="${o.no}">Заказ получен</button>`;
+    if (o.st === 'got' && !o.review && !S.flags.minus) return `<button class="btn primary lg block" data-act="revOpen" data-no="${o.no}">Оставить отзыв</button>`;
+    if (o.st === 'cancel' && o.wasProcess && !o.review && !S.flags.minus) return `<button class="btn secondary lg block" data-act="revOpen" data-no="${o.no}">Оставить отзыв</button>`;
+    return '';
+  }
+  function lkManage(o) {
+    const next = V('logic') === 'next'; const a = [];
+    if (o.st === 'sent') a.push(`<button class="btn secondary block" data-act="soon" data-text="Ссылка ведёт на отслеживание у перевозчика">Отследить посылку</button>`);
+    if (o.st === 'sent') a.push(`<button class="btn secondary block" data-act="cfm" data-k="openDispute" data-no="${o.no}">Открыть спор</button>`);
+    if (o.st === 'dispute' && o.by === 'buyer') a.push(`<button class="btn secondary block" data-act="cfm" data-k="closeDispute" data-no="${o.no}">Закрыть спор</button>`);
+    if (next && ['approve', 'pay', 'paid', 'process'].includes(o.st) && !o.dlReq) a.push(`<button class="btn secondary block" data-act="dlOpen" data-no="${o.no}">Изменить доставку</button>`);
+    if (['approve', 'pay'].includes(o.st)) a.push(`<button class="btn secondary block" data-act="cfm" data-k="cancel" data-no="${o.no}">Отменить заказ</button>`);
+    if (next && ['paid', 'process'].includes(o.st) && !o.cancelReq) a.push(`<button class="btn secondary block" data-act="cfm" data-k="askCancel" data-no="${o.no}">Запросить отмену</button>`);
+    return a.join('');
+  }
+  function pageLkOrder(no) {
+    const o = lkGet(no);
+    if (!o) return lkShell('orders', `<div class="empty"><p class="h3">Заказ не найден</p><a class="btn primary" style="margin-top:16px" href="#/lk/orders">Все покупки</a></div>`);
+    const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const n = lkNext(o); const D = DELIVERY[o.dl];
+    const row = (k, v) => `<div class="info-r"><dt>${k}</dt><dd>${v}</dd></div>`;
+    const main = lkMainAct(o); const manage = lkManage(o);
+    return lkShell('orders', `<a class="back" href="#/lk/orders">${ic('left', 16)}Все покупки</a>
+      <div class="ordp-hd"><h1 class="h1">Заказ №${o.no}</h1><span class="ost ${st.c}">${st.t}</span></div>
+      <div class="ordp">
+        <div class="stack-12">
+          <section class="ord-next ord-next-p ${st.c}"><p class="h3">${esc(n.h)}</p><p>${esc(n.p)}</p>${n.d ? `<p class="ord-dead">${ic('clock', 16)}<span>${esc(n.d)}</span></p>` : ''}${o.cancelReq ? '<p class="c2">Запрос на отмену отправлен продавцу</p>' : ''}${o.dlReq ? '<p class="c2">Запрос на смену доставки отправлен продавцу</p>' : ''}</section>
+          <section class="card"><h2 class="h3 ordp-t">Как идёт заказ</h2>${lkTimeline(o)}</section>
+          <section class="card"><h2 class="h3 ordp-t">Товары</h2><div class="ord-items">${o.lines.map((l) => { const it = byId(l.id); return `<a class="ord-it" href="#/${it.lot ? 'lot' : 'item'}/${it.id}"><img src="${it.img}" alt=""><span class="ord-t">${esc(it.title)}<span class="c2 ord-q">${l.qty} шт.</span></span><span class="sb ord-p">${fmt(it.price * l.qty)}</span></a>`; }).join('')}</div>
+            ${o.review ? `<div class="ord-rev"><p class="sb">Ваш отзыв</p><div class="rev-st">${[1, 2, 3, 4, 5].map((x) => `<span class="${x <= o.review.stars ? 'on' : ''}">${STAR}</span>`).join('')}</div><p>${esc(o.review.text)}</p></div>` : ''}</section>
+          <section class="card"><h2 class="h3 ordp-t">Доставка и оплата</h2><dl class="info">
+            ${row('Способ получения', esc(D.title))}
+            ${o.track ? row('Трек-номер', `${esc(o.track)} <button class="linkbtn" data-act="copy" data-v="${esc(o.track)}">Скопировать</button>`) : ''}
+            ${row('Способ оплаты', esc(PAYWAY[o.pay].title))}
+            ${o.receipt ? row('Чек', `<button class="linkbtn" data-act="soon" data-text="Файл открывается в новой вкладке">${ic('clip', 16)}${esc(o.receipt)}</button>`) : ''}
+          </dl></section>
+        </div>
+        <aside class="stack-12 ordp-side">
+          <section class="card stack-8"><div class="sum-row"><span class="c2">Товары</span><span class="v">${fmt(lkSum(o))}</span></div><div class="sum-row"><span class="c2">Доставка</span><span class="v">${D.price ? fmt(D.price) : 'бесплатно'}</span></div>${lkFee(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(lkFee(o))}</span></div>` : ''}<div class="sum-total"><span>Итого</span><span class="v">${fmt(lkTotal(o))}</span></div>${main}</section>
+          <section class="card stack-8"><h2 class="h3">Продавец</h2><a class="link" href="#/reviews/${lkSeller(o)}" target="_blank">${esc(s.name)}</a><p class="c2">г. ${esc(s.city)}</p>${S.flags.minus ? '<p class="c2">Контакты скрыты: баланс ниже нуля</p>' : `<button class="btn secondary block" data-act="soon" data-text="Контакт продавца открывается в Телеграме или ВК">Написать продавцу</button>`}</section>
+          ${manage ? `<section class="card stack-8"><h2 class="h3">Действия с заказом</h2>${manage}</section>` : ''}
+        </aside>
+      </div>`);
+  }
+  function lkCard(o) {
+    const n = lkNext(o); const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const first = byId(o.lines[0].id); const url = `#/lk/order/${o.no}`;
+    const count = o.lines.reduce((a, l) => a + l.qty, 0);
+    return `<article class="ord ord-c card" id="o${o.no}">
+      <header class="ord-hd"><div><a class="h3 ord-no" href="${url}">Заказ №${o.no}</a><p class="c2">${esc(s.name)}</p></div><span class="ost ${st.c}">${st.t}</span></header>
+      <a class="ord-it" href="${url}"><img src="${first.img}" alt=""><span class="ord-t">${esc(first.title)}${o.lines.length > 1 ? ` и ещё ${o.lines.length - 1}` : ''}<span class="c2 ord-q">${count} шт.</span></span><span class="sb ord-p">${fmt(lkTotal(o))}</span></a>
+      <div class="ord-next ${st.c} ${n.d ? 'has-d' : ''}"><p class="sb">${esc(n.h)}</p>${n.d ? `<p>${esc(n.d)}</p>` : ''}</div>
+      <div class="ord-ft">${lkMainAct(o).replace('lg block', '')}<a class="btn secondary" href="${url}">Подробнее</a></div>
+    </article>`;
+  }
+  function pageLkOrders() {
+    const tab = ui.lkTab || 'all'; const q = (ui.lkQ || '').trim().toLowerCase(); const f = ui.lkF || {};
+    const active = (o) => !['got', 'cancel'].includes(o.st);
+    const all = lkOrders();
+    const hit = (o) => { const s = SELLERS[lkSeller(o)]; const hay = `${o.no} ${s.name} ${o.lines.map((l) => byId(l.id).title).join(' ')}`.toLowerCase(); return !q || hay.includes(q); };
+    let list = all.filter((o) => (tab === 'all' || (tab === 'on' ? active(o) : !active(o))) && hit(o) && (!f.st || f.st === 'all' || o.st === f.st) && (!f.pay || f.pay === 'all' || o.pay === f.pay) && (!f.dl || f.dl === 'all' || o.dl === f.dl));
+    if (f.sort === 'old') list = list.slice().reverse();
+    if (f.sort === 'cheap') list = list.slice().sort((a, b) => lkTotal(a) - lkTotal(b));
+    if (f.sort === 'dear') list = list.slice().sort((a, b) => lkTotal(b) - lkTotal(a));
+    const tabs = [['all', 'Все', all.length], ['on', 'Активные', all.filter(active).length], ['off', 'Завершённые', all.filter((o) => !active(o)).length]];
+    const need = all.filter((o) => (o.st === 'pay' && o.pay !== 'cash') || o.st === 'sent').length;
+    const stOpts = [['all', 'Любой статус']].concat(Object.keys(OST).map((k) => [k, OST[k].t]));
+    const payOpts = [['all', 'Любая оплата']].concat(Object.keys(PAYWAY).map((k) => [k, PAYWAY[k].title]));
+    const dlOpts = [['all', 'Любая доставка']].concat(Object.keys(DELIVERY).map((k) => [k, DELIVERY[k].title]));
+    return lkShell('orders', `<h1 class="h1" style="margin-bottom:12px">Покупки</h1>
+      ${S.flags.minus ? `<div class="note warn" style="margin-bottom:12px">${ic('alert')}<div class="body">Баланс ниже нуля, поэтому контакты второй стороны и отзывы недоступны. Пополните баланс, чтобы вернуть их</div></div>` : ''}
+      ${all.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x">${tabs.map(([k, l, n]) => `<button class="${tab === k ? 'on' : ''}" data-act="lkTab" data-v="${k}">${l} ${n}</button>`).join('')}</div></div>
+      <div class="lk-flt"><input class="inp lk-q" id="lkQ" placeholder="Номер, товар или продавец" aria-label="Поиск по заказам" value="${esc(ui.lkQ || '')}">${dd('lkSt', f.st || 'all', stOpts, { aria: 'Статус' })}${dd('lkPay', f.pay || 'all', payOpts, { aria: 'Способ оплаты' })}${dd('lkDl', f.dl || 'all', dlOpts, { aria: 'Доставка' })}${dd('lkSort', f.sort || 'new', [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['cheap', 'Сначала дешевле'], ['dear', 'Сначала дороже']], { aria: 'Сортировка' })}</div>
+      ${need && tab !== 'off' ? `<p class="c2 lk-need">Ждут вашего действия: ${need}</p>` : ''}
+      ${list.length ? `<div class="stack-12">${list.map(lkCard).join('')}</div>` : `<div class="empty"><div class="ico">${ic('search', 28)}</div><p class="h3">Заказов не найдено</p><p class="c2">Измените поиск или фильтры</p></div>`}`
+        : `<div class="empty"><div class="ico">${ic('cart', 28)}</div><p class="h3">Пока нет покупок</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши заказы, оплата и чеки</p><a class="btn primary" href="#/catalog">Перейти в каталог</a></div>`}`);
+  }
+  function pageLk(r) {
+    if (r.id === 'auctions') return isAuth() ? pageLkBids() : lkGuest('Войдите, чтобы увидеть свои торги');
+    if (r.id === 'order') return isAuth() ? pageLkOrder(r.sub) : lkGuest('Войдите, чтобы открыть заказ');
+    return isAuth() ? pageLkOrders() : lkGuest('Войдите, чтобы увидеть заказы');
+  }
+
+  /* ---------- Слои ЛК ---------- */
+  const sizeTxt = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} МБ` : `${Math.max(1, Math.round(b / 1024))} КБ`);
+  function rcBlock() {
+    const r = ui.rc || {};
+    return `<div class="rc"><p class="lbl-b">Чек об оплате</p>
+      ${r.name ? `<div class="rc-f ${r.err ? 'bad' : ''}">${ic('clip', 20)}<span class="rc-n"><span class="sb">${esc(r.name)}</span><span class="t12 c3">${esc(r.size || '')}</span></span><button class="icon-btn" style="width:32px;height:32px" data-act="rcClear" aria-label="Убрать файл">${ic('x', 16)}</button></div>`
+        : `<label class="rc-drop ${r.err ? 'bad' : ''}"><input type="file" id="rcFile" accept=".jpg,.jpeg,.png,.pdf">${ic('clip', 20)}<span class="sb">Выбрать файл</span></label>`}
+      ${r.err ? `<p class="err-t">${ic('alert', 14)}<span>${esc(r.err)}</span></p>` : '<p class="hint">JPG, PNG или PDF, до 20 МБ</p>'}</div>`;
+  }
+  function lkModals() {
+    const m = ui.modal; if (!m) return '';
+    const wrap = (title, body, foot, label) => `<div class="scrim" data-act="closeModal"><div class="modal" role="dialog" aria-label="${esc(label || title)}" data-stop><div class="modal-hd"><span class="h3">${esc(title)}</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div><div class="modal-bd stack-12">${body}</div>${foot ? `<div class="modal-ft">${foot}</div>` : ''}</div></div>`;
+    if (m.pay && lkGet(m.pay).pay === 'safe') {
+      const o = lkGet(m.pay);
+      return wrap(`Оплата заказа №${o.no}`, `<div class="reqs"><div class="req"><span class="c2">Товары и доставка</span><span class="req-v sb">${fmt(lkTotal(o) - lkFee(o))}</span></div><div class="req"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="req-v sb">${fmt(lkFee(o))}</span></div></div><div class="note ok">${ic('shield')}<div class="body">Деньги хранятся у нас, пока вы не получите заказ. Чек загружать не нужно</div></div>`, `<button class="btn primary lg block" data-act="safePay">Оплатить ${fmt(lkTotal(o))}</button>`);
+    }
+    if (m.pay) {
+      const o = lkGet(m.pay); const s = SELLERS[lkSeller(o)];
+      const row = (k, v, copy) => `<div class="req"><span class="c2">${k}</span><span class="req-v sb">${esc(v)}</span><button class="linkbtn t12" data-act="copy" data-v="${esc(copy || v)}">Скопировать</button></div>`;
+      return wrap(`Оплата заказа №${o.no}`, `<div class="note warn">${ic('alert')}<div class="body">Оплатите до ${esc(atH(o.left))}, осталось ${esc(hrsLeft(o.left))}. Иначе заказ отменится</div></div>
+        <div class="reqs">${row('Сумма', fmt(lkTotal(o)), String(lkTotal(o)))}${row('Номер карты', '2200 1234 5678 9012')}${row('Получатель', `${s.name}, Иван П.`)}</div>
+        ${rcBlock()}`, `<button class="btn primary lg block ${ui.rcBusy ? 'is-loading' : ''}" data-act="rcSend">${ui.rcBusy ? '<span class="spin"></span>' : 'Отправить чек'}</button>`);
+    }
+    if (m.cfm) {
+      const O = m.no ? lkGet(m.no) : null; const T = { got: ['Подтвердить получение?', O && O.pay === 'safe' ? 'После подтверждения продавец получит деньги, а открыть спор будет нельзя' : 'После подтверждения нельзя будет открыть спор', 'Заказ получен', 'primary'], openDispute: ['Открыть спор?', 'Напишите нам на почту: укажите номер заказа и опишите причину', 'Открыть спор', 'primary'], cancel: ['Отменить заказ?', 'Заказ отменится для вас и продавца. Вернуть его будет нельзя', 'Отменить заказ', 'primary'], askCancel: ['Запросить отмену?', 'Продавец получит запрос. Заказ отменится, если он согласится, и он вернёт деньги напрямую', 'Отправить запрос', 'primary'], closeDispute: ['Закрыть спор?', 'Заказ вернётся в статус «Отправлен»', 'Закрыть спор', 'primary'], dropLot: ['Отказаться от лота?', 'За отказ от выигранного лота спишется штраф. Лот вернётся продавцу', 'Отказаться', 'primary'] }[m.cfm];
+      const alt = '';
+      return wrap(T[0], `<p class="c2">${esc(T[1])}</p>`, `<button class="btn primary block" data-act="cfmDo" data-k="${m.cfm}">${T[2]}</button>${alt}<button class="btn ghost block" data-act="closeModal">Назад</button>`);
+    }
+    if (m.dl) {
+      const o = lkGet(m.dl); const s = SELLERS[lkSeller(o)];
+      return wrap('Изменить доставку', `<p class="c2">Продавец получит запрос и подтвердит новую стоимость</p><div class="opt-list">${s.deliveries.map((d) => { const on = d === (ui.dlNew || o.dl); return `<label class="opt ${on ? 'on' : ''}"><input type="radio" name="dlNew" value="${d}" ${on ? 'checked' : ''}><span class="main">${esc(DELIVERY[d].title)}</span></label>`; }).join('')}</div>`, `<button class="btn primary block" data-act="dlSend">Отправить запрос</button>`);
+    }
+    if (m.rev) {
+      const r = ui.rv || {};
+      return wrap('Отзыв о заказе', `<div><p class="lbl-b">Оценка</p><div class="rate-in">${[1, 2, 3, 4, 5].map((x) => `<button class="${x <= (r.stars || 0) ? 'on' : ''}" data-act="revStar" data-v="${x}" aria-label="${x} из 5">${STAR}</button>`).join('')}</div>${r.errS ? `<p class="err-t">${ic('alert', 14)}<span>Поставьте оценку</span></p>` : ''}</div>
+        <label class="fld"><span class="lbl">Ваш отзыв</span><textarea class="inp" id="revText" rows="4">${esc(r.text || '')}</textarea>${r.errT ? `<span class="err-t">${ic('alert', 14)}<span>Напишите отзыв</span></span>` : ''}</label>
+        <button class="linkbtn" data-act="soon" data-text="Прикрепление изображений как на сайте">${ic('clip', 16)}Добавить изображения</button>`, `<button class="btn primary lg block" data-act="revSend">Опубликовать</button>`);
+    }
+    if (m.bidsOf) {
+      const a = byAny(m.bidsOf); const l = lotInfo(a); const n = Math.min(l.bids, 6);
+      const rows = Array.from({ length: n }, (_, i) => `<div class="req"><span class="c2">${i === 0 && l.ls.my === l.price ? 'Вы' : `User${51234 - i * 73}`}</span><span class="req-v sb">${fmt(l.price - i * l.step)}</span><span class="t12 c3">${atH(-(i + 1) * 3)}</span></div>`).join('');
+      return wrap(`Ставки: ${l.bids}`, n ? `<div class="reqs">${rows}</div>` : '<p class="c2">Ставок пока нет</p>');
+    }
+    if (m.mail) {
+      const sent = ui.mailSent;
+      return wrap('Подтвердите почту', `<p class="c2">Для ставки нужна подтверждённая почта. ${sent ? 'Мы отправили код на ivanov@example.com' : 'Отправим код на ivanov@example.com'}</p>${sent ? `<label class="fld"><span class="lbl">Код из письма</span><input class="inp" id="mailCode" inputmode="numeric" placeholder="1234"></label>${ui.mailErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.mailErr)}</span></p>` : ''}<button class="linkbtn" data-act="soon" data-text="Код отправлен ещё раз">Отправить код ещё раз</button>` : ''}`, sent ? `<button class="btn primary lg block" data-act="mailDo">Подтвердить и продолжить</button>` : `<button class="btn primary lg block" data-act="mailSend">Отправить код</button>`);
+    }
+    return '';
+  }
+
+  /* ---------- Аукцион ---------- */
+  const LOTX = { 'a-leman': { step: 50, reserve: 1500 }, 'a-guilliman': { step: 50, blitz: 2500 }, 'a-redemptor': { step: 50 }, 'a-deathwatch': { step: 50 }, 'a-own': { step: 50 } }; // пример: шаг, резерв и блиц-цена
+  const MAX_BET = 1000000;
+  function lotInfo(a) {
+    const x = LOTX[a.id] || { step: 50 }; const b = route().q.ended && LK_BIDS.find((z) => z.id === a.id); const ls = ((S.lot || {})[a.id] && S.lot[a.id].st) ? S.lot[a.id] : (b ? { st: b.st === 'wonDemo' ? 'won' : b.st, my: b.my } : ((S.lot || {})[a.id] || {}));
+    const price = ls.price || a.price; const bids = a.bids + (ls.n || 0);
+    return { x, ls, price, bids, step: x.step, next: bids ? price + x.step : price, end: T0 + a.hours * 3600000, over: ['won', 'lost', 'reserve', 'ended'].includes(ls.st) };
+  }
+  const isOwnLot = (a) => role() === 'seller' && a.seller === OWN_SELLER;
+  function bidPanel(a) {
+    const l = lotInfo(a); const s = SELLERS[a.seller]; const x = l.x; const ls = l.ls; const own = isOwnLot(a);
+    const urgent = l.end - Date.now() <= URGENT_MS;
+    const dl = s.deliveries.map((d) => DELIVERY[d].title).join(', ');
+    const reserve = x.reserve ? `<span class="tag ${l.price >= x.reserve ? 'ok' : 'warn'}">${l.price >= x.reserve ? 'Резерв достигнут' : 'Резерв не достигнут'}</span>` : '';
+    const T = V('timer'); const left = l.end - Date.now();
+    const cell = (k, t) => `<span><b data-c="${k}"></b><i>${t}</i></span>`;
+    const liveHead = T === 'price' ? '' : T === 'line' ? `<div class="bt-line ${urgent ? 'urgent' : ''}" data-tw><span class="bt-l">До конца торгов</span><b data-end="${l.end}"></b></div>`
+      : T === 'cells' ? `<div class="bt-cells ${urgent ? 'urgent' : ''}" data-tw data-cells="${l.end}"><p class="bt-l">До конца торгов</p><div class="bt-row">${cell('h', 'часов')}${cell('m', 'минут')}${cell('s', 'секунд')}</div></div>`
+      : T === 'bar' ? `<div class="bt-bar ${urgent ? 'urgent' : ''}" data-tw><div class="between"><span>Осталось <b data-left="${l.end}"></b></span><span class="c2">до ${esc(atH(a.hours))}</span></div><i><u style="width:${Math.max(4, Math.min(100, Math.round(left / (72 * 3600000) * 100)))}%"></u></i></div>`
+      : `<div class="bid-timer ${urgent ? 'urgent' : ''}" data-tw><span class="t12">До конца торгов</span><b data-end="${l.end}"></b><span class="t12">Окончание ${atH(a.hours)}</span></div>`;
+    const head = l.over ? `<div class="bid-end"><span class="sb">Торги завершены</span><span class="t12 c2">${atH(-2)}</span></div>` : liveHead;
+    const meta = `<button class="linkbtn" data-act="bidsOpen" data-id="${a.id}">${l.bids ? `${l.bids} ${plural(l.bids, 'ставка', 'ставки', 'ставок')}` : 'Ставок пока нет'}</button>${reserve}`;
+    const priceL = `<div><p class="t12 c2">${l.over ? 'Последняя ставка' : l.bids ? 'Текущая ставка' : 'Стартовая цена'}</p><p class="price-big">${fmt(l.price)}</p></div>`;
+    const price = T === 'price' && !l.over ? `<div class="bid-pair">${priceL}<div class="bt-pair ${urgent ? 'urgent' : ''}" data-tw><p class="t12 c2">До конца торгов</p><b data-end="${l.end}"></b></div></div><div class="bid-meta row-m">${meta}</div>` : `<div class="bid-now">${priceL}<div class="bid-meta">${meta}</div></div>`;
+    let note = '';
+    if (ls.st === 'lead') note = `<div class="note ok">${ic('check')}<div class="body">Вы лидируете со ставкой ${fmt(ls.my)}${ls.auto ? `. Автоставка до ${fmt(ls.auto)}: поднимем ставку, если её перебьют` : ''}</div></div>`;
+    if (ls.st === 'outbid') note = `<div class="note warn">${ic('alert')}<div class="body">Вашу ставку ${fmt(ls.my)} перебили. Поставьте от ${fmt(l.next)}, чтобы вернуться в лидеры</div></div>`;
+    if (ls.st === 'won') {
+      note = `<div class="note ok">${ic('check')}<div class="body"><b>Вы выиграли лот за ${fmt(ls.my)}</b></div></div>
+        <ol class="tl"><li class="now"><span class="d">1</span><div><p class="tl-t">Оформите заказ за 48 часов</p><p class="tl-d">Лот уже в корзине. Если не оформить, спишется штраф</p></div></li><li><span class="d">2</span><div><p class="tl-t">Продавец подтвердит заказ</p><p class="tl-d">Проверит наличие и стоимость доставки</p></div></li><li><span class="d">3</span><div><p class="tl-t">Оплатите заказ</p></div></li></ol>
+        <button class="btn primary lg block" data-act="wonGo" data-id="${a.id}" data-p="${ls.my}">Перейти в корзину</button>`;
+    }
+    if (ls.st === 'lost') note = `<div class="note info">${ic('info')}<div class="body">Лот выиграл другой участник. Ваша ставка ${fmt(ls.my)}</div></div><a class="btn secondary lg block" href="#/catalog" data-act="tab" data-v="auc">Другие аукционы</a>`;
+    if (ls.st === 'reserve') note = `<div class="note warn">${ic('alert')}<div class="body">Резерв не достигнут: лот не продан, штрафа нет. Решение за продавцом</div></div>`;
+    if (ls.st === 'ended') note = `<div class="note info">${ic('info')}<div class="body">Торги завершились без ставок</div></div>`;
+    if (own) note = `<div class="note info">${ic('info')}<div class="body">Это ваш аукцион: ставить на него нельзя. Участников и ставки видно здесь</div></div>`;
+    let form = '';
+    if (!l.over && !own) {
+      if (S.flags.minus && isAuth()) form = `<div class="note bad">${ic('alert')}<div class="body">Баланс ниже нуля. Пополните его, чтобы участвовать в торгах</div></div>`;
+      else {
+        const arm = ui.bidArm; const lead = ls.st === 'lead';
+        form = arm ? `<div class="bid-arm">
+            <p class="bid-arm-l">Подтвердите ставку</p>
+            <p class="bid-arm-a">${fmt(arm)}</p>
+            <p class="bid-arm-s">${l.bids ? `Текущая ставка ${fmt(l.price)}` : `Стартовая цена ${fmt(l.price)}`}. Отменить ставку нельзя</p>
+            ${lead ? `<p class="bid-arm-w">${ic('info', 16)}<span>Ваша ставка уже лидирует</span></p>` : ''}${arm >= l.price * 3 ? `<p class="bid-arm-w bad">${ic('alert', 16)}<span>Это в ${Math.floor(arm / l.price)} ${plural(Math.floor(arm / l.price), 'раз', 'раза', 'раз')} больше текущей ставки</span></p>` : ''}
+            <button class="btn primary lg block" id="bidOk" data-act="bidDo">Подтвердить ставку</button>
+            <button class="linkbtn bid-arm-e" data-act="bidBack">Изменить сумму</button>
+          </div>`
+          : `<div class="bid-f"><label class="lbl" for="bidI">Ваша ставка, ₽</label><div class="bid-row"><input class="inp" id="bidI" inputmode="numeric" value="${esc(ui.bidV !== undefined ? ui.bidV : l.next)}"><button class="btn primary" data-act="${isAuth() ? 'bidGo' : 'loginFor'}" ${isAuth() ? '' : 'data-text="Войдите, чтобы сделать ставку"'}>Сделать ставку</button></div>
+          ${ui.bidErr ? `<p class="err-t" role="alert">${ic('alert', 14)}<span>${esc(ui.bidErr)}</span></p>` : `<p class="hint">От ${fmt(l.next)}, шаг от ${fmt(l.step)}</p>`}</div>
+          ${isAuth() ? `<button class="linkbtn" data-act="autoT" aria-expanded="${!!ui.autoOpen}">Автоставка ${ic(ui.autoOpen ? 'up' : 'down', 16)}</button>
+          ${ui.autoOpen ? `<div class="bid-auto"><p class="t12 c2">Поднимем вашу ставку на шаг, когда её перебьют, но не выше этой суммы</p><div class="row"><input class="inp" id="autoI" inputmode="numeric" placeholder="Сумма, ₽" aria-label="Сумма автоставки" value="${esc(ls.auto || '')}"><button class="btn secondary" data-act="autoGo">Сохранить</button></div>${ui.autoErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.autoErr)}</span></p>` : ''}</div>` : ''}` : ''}
+          ${x.blitz ? `<button class="btn lg block blitz" data-act="${isAuth() ? 'blitz' : 'loginFor'}" ${isAuth() ? '' : 'data-text="Войдите, чтобы купить лот"'}>Купить по блиц-цене ${fmt(x.blitz)}</button>` : ''}`;
+      }
+    }
+    return `<div class="buy-top"><a class="c3 t12" href="#/catalog" data-act="nodeq" data-v="${esc(a.cat)}">${esc(a.cat)}</a><h1 class="pdp-title">${esc(a.title)}</h1></div>
+      ${head}${price}${note}${form}
+      <ul class="facts">
+        <li>${ic('truck')}<span><b>Доставка.</b> ${esc(dl)}. Стоимость подтвердит продавец</span></li>
+        ${own || l.over ? '' : `<li>${ic('alert')}<span><b>Если выиграете.</b> Оформите заказ за 48 часов, иначе спишется штраф. Ставку отменить нельзя</span></li>`}
+      </ul>`;
+  }
+  function pageLot(r) {
+    const a = byAny(r.id) || AUCTIONS[0]; const s = SELLERS[a.seller];
+    const others = AUCTIONS.filter((x) => x.id !== a.id).slice(0, 4);
+    const tabs = [['desc', 'Описание']].concat((a.specs || []).length ? [['specs', 'Характеристики']] : [], [['talk', 'Обсуждение']]);
+    const body = itemTab(a);
+    return `<div class="wrap page lot-p">
+      ${crumbs([HOME_C, CAT_C, { t: a.cat, a: `data-act="nodeq" data-v="${esc(a.cat)}"` }])}
+      <div class="pdp">
+        <div class="pdp-main">${gallery(a)}</div>
+        <div class="pdp-side stack-12"><div class="card buy" id="bidBox">${bidPanel(a)}</div>${sellerCard(a)}</div>
+        <div class="pdp-main card">
+          <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${ui.tab === k}" class="${ui.tab === k ? 'on' : ''}" data-act="itab" data-v="${k}">${l}</button>`).join('')}</div>
+          <div class="tab-body">${body}</div>
+        </div>
+      </div>
+      ${others.length ? `<section class="sec"><div class="sec-hd"><h2 class="h2">Другие аукционы</h2></div><div class="scroller">${others.map(acard).join('')}</div></section>` : ''}
+    </div>`;
+  }
+  function lotSticky(a) {
+    const l = lotInfo(a);
+    if (l.ls.st === 'won') return `<div class="sticky-bar"><div class="sum"><span class="t12 c3">Вы выиграли</span><b>${fmt(l.ls.my)}</b></div><a class="btn primary lg" href="#/cart">В корзину</a></div>`;
+    if (l.over || isOwnLot(a) || ui.bidArm) return '';
+    return `<div class="sticky-bar"><div class="sum"><span class="t12 c3">${l.bids ? 'Текущая ставка' : 'Стартовая цена'}</span><b>${fmt(l.price)}</b></div><button class="btn primary lg" data-act="bidFocus">Сделать ставку</button></div>`;
+  }
+
+  /* ---------- ЛК: торги ---------- */
+  const LK_BIDS = [{ id: 'a-leman', st: 'lead', my: 900 }, { id: 'a-guilliman', st: 'outbid', my: 300 }, { id: 'a-redemptor', st: 'wonDemo', my: 650 }, { id: 'a-deathwatch', st: 'lost', my: 400 }];
+  function pageLkBids() {
+    const tab = ui.bidTab || 'all'; const res = ui.bidRes || 'all';
+    const data = S.flags.noBids ? [] : LK_BIDS.map((b) => { const ls = (S.lot || {})[b.id]; return ls && ls.st ? Object.assign({}, b, { st: ls.st, my: ls.my || b.my, auto: ls.auto }) : b; });
+    const done = (b) => ['won', 'wonDemo', 'lost', 'reserve', 'ended'].includes(b.st);
+    const win = (b) => ['won', 'wonDemo'].includes(b.st);
+    const list = data.filter((b) => (tab === 'all' || (tab === 'on' ? !done(b) : done(b))) && (res === 'all' || (res === 'win' ? win(b) : done(b) && !win(b))));
+    const TAG = { lead: ['ok', 'Вы лидируете'], outbid: ['act', 'Ставку перебили'], won: ['ok', 'Вы выиграли'], wonDemo: ['ok', 'Вы выиграли'], lost: ['mute', 'Лот у другого участника'], reserve: ['mute', 'Резерв не достигнут'], ended: ['mute', 'Завершён'] };
+    const card = (b) => {
+      const a = byAny(b.id); const l = lotInfo(a); const t = TAG[b.st] || ['wait', 'Идут торги'];
+      const url = `#/lot/${a.id}${done(b) ? '?ended=1' : ''}`; const need = win(b) && !(S.wonDone || []).includes(b.id);
+      const cta = b.st === 'outbid' ? `<a class="btn primary" href="${url}">Поставить снова</a>` : need ? `<button class="btn primary" data-act="wonGo" data-id="${a.id}" data-p="${b.my}">Оформить заказ</button>` : `<a class="btn secondary" href="${url}">Открыть лот</a>`;
+      return `<article class="ord card"><header class="ord-hd"><div><h2 class="h3">${esc(a.title)}</h2><p class="t12 c3">${esc(SELLERS[a.seller].name)}</p></div><span class="ost ${t[0]}">${t[1]}</span></header>
+        <div class="ord-items"><a class="ord-it" href="${url}"><img src="${a.img}" alt=""><span class="bid-rows"><span><span class="c2">Ваша ставка</span> <b>${fmt(b.my)}</b></span><span><span class="c2">${done(b) ? 'Последняя ставка' : 'Текущая'}</span> <b>${fmt(l.price)}</b></span>${b.auto ? `<span><span class="c2">Автоставка</span> <b>${fmt(b.auto)}</b></span>` : ''}${done(b) ? '' : `<span><span class="c2">До конца</span> <b data-end="${l.end}"></b></span>`}${need ? '<span class="ord-need">Оформите заказ за 48 часов</span>' : ''}</span></a></div>
+        <div class="ord-ft"><span></span><div class="ord-acts">${cta}</div></div></article>`;
+    };
+    return lkShell('auctions', `<h1 class="h1" style="margin-bottom:12px">Торги</h1>
+      ${data.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x">${[['all', 'Все'], ['on', 'Активные'], ['off', 'Завершённые']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="bidTab" data-v="${k}">${l}</button>`).join('')}</div>${dd('bidRes', res, [['all', 'Любой итог'], ['win', 'Выигранные'], ['lose', 'Проигранные']], { aria: 'Итог торгов' })}</div>
+      ${list.length ? `<div class="stack-12">${list.map(card).join('')}</div>` : `<div class="empty"><p class="h3">Ничего не найдено</p><p class="c2">Выберите другой фильтр</p></div>`}`
+        : `<div class="empty"><div class="ico">${ic('gavel', 28)}</div><p class="h3">Вы пока не участвовали в торгах</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши ставки и выигранные лоты</p><a class="btn primary" href="#/catalog" data-act="tab" data-v="auc">Смотреть аукционы</a></div>`}`);
   }
 
   /* ---------- Слои ---------- */
@@ -1214,21 +1576,24 @@
     const old = ovEl.querySelector('.modal-bd, .drawer-bd'); const top = old ? old.scrollTop : 0;
     let h = '';
     if (ui.drawer) h += drawerHtml();
-    if (ui.filters) {
-      const one = ui.fEdit;
-      const head = one ? FTITLE[one] : 'Фильтры';
-      const body = one ? fBody(one) : `${window.innerWidth < 768 ? `${fsec('sort', 'Сортировка', dd('sort', S.cat.sort, SORTS, { aria: 'Сортировка' }))}${fsec('per', 'Выводить по', perDd(true))}` : ''}${filtersHtml()}`;
-      const foot = one ? `<button class="btn primary lg block" data-act="closeFilters">Показать ${catalogList().length}</button>` : `<button class="btn primary lg block" data-act="closeFilters">Показать ${catalogList().length}</button><div class="flt-ft2"><button class="btn ghost sm" data-act="resetCat">Сбросить</button><button class="btn secondary sm" data-act="saveSearch">${ic('save', 16)}Сохранить поиск</button></div>`;
-      h += `<div class="scrim" data-act="closeFilters"><div class="modal" role="dialog" aria-label="${head}" data-stop><div class="modal-hd"><span class="h3">${head}</span><button class="icon-btn" data-act="closeFilters" aria-label="Закрыть">${ic('x')}</button></div><div class="modal-bd">${body}</div><div class="modal-ft flt-ft">${foot}</div></div></div>`;
-    }
     if (ui.modal && ui.modal.login !== undefined) {
-      const stub = 'data-act="soon" data-text="Вход разберём в сценарии покупки с аккаунтом"';
+      const stub = 'data-act="soon" data-text="Вход через соцсети это блок первого визита"';
       h += `<div class="scrim" data-act="closeModal"><div class="modal" role="dialog" aria-label="Вход" data-stop><div class="modal-hd"><span class="h3">Вход</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div>
         <div class="modal-bd stack-12">${ui.modal.login ? `<p class="c2">${esc(ui.modal.login)}</p>` : ''}<label class="fld"><span class="lbl">Email</span><input class="inp" type="email"></label><label class="fld"><span class="lbl">Пароль</span><input class="inp" type="password"></label>
-        <button class="btn primary lg block" ${stub}>Войти</button>
+        <button class="btn primary lg block" data-act="loginDo">Войти</button>
         <a class="link" href="#/" data-act="soon" data-text="Восстановление пароля соберём с регистрацией">Забыли пароль?</a>
         <div class="row"><button class="btn secondary block" ${stub}>ВКонтакте</button><button class="btn secondary block" ${stub}>Яндекс ID</button></div></div></div></div>`;
     }
+    if (ui.modal && ui.modal.profile) {
+      const p = ui.modal.profile;
+      const li = (t, text) => `<button class="prof-i" data-act="soon" data-text="${text}">${t}</button>`;
+      h += `<div class="prof-sc" data-act="closeModal"><nav class="prof-menu" aria-label="Профиль" data-stop style="top:${p.top}px;right:${p.right}px">
+        <p class="prof-n sb">${esc(myName())}</p>
+        <a class="prof-i" href="#/lk/orders" data-act="closeModal">Покупки</a><a class="prof-i" href="#/lk/auctions" data-act="closeModal"><span>Торги</span>${wonNeed() ? `<span class="badge-i">${wonNeed()}</span>` : ''}</a>${li('Продажи', 'Продажи это блок продажи')}${li('Товары', 'Товары это блок продажи')}${li('Баланс', 'Баланс и пополнение комиссии это блок продажи')}${li('Настройки', 'Поля ЛК это блок первого визита')}
+        <button class="prof-i" data-act="logout">Выход</button>
+      </nav></div>`;
+    }
+    h += lkModals();
     if (ui.modal && ui.modal.report) {
       h += `<div class="scrim" data-act="closeModal"><div class="modal" role="dialog" aria-label="Жалоба" data-stop><div class="modal-hd"><span class="h3">Пожаловаться на объявление</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div>
         <div class="modal-bd stack-12"><p class="c2">Сообщите нам причину, по которой объявление нужно удалить или исправить:</p><div class="opt-list">${REPORT.map((t) => `<button type="button" class="opt" style="text-align:left" data-act="reportDo"><span class="main">${esc(t)}</span></button>`).join('')}</div></div>
@@ -1241,7 +1606,7 @@
         <div class="opt-list">${PVZ.map((p) => `<button type="button" class="opt" style="text-align:left" data-act="pvzPick" data-s="${sid}" data-v="${p.id}"><span class="main"><span class="sb">${p.name}</span><span class="t12 c3" style="display:block">${p.hours}</span></span></button>`).join('')}</div></div></div></div>`;
     }
     if (ui.lb !== null) {
-      const it = byId(route().id) || ITEMS[0];
+      const it = byAny(route().id) || ITEMS[0];
       h += `<div class="lb" role="dialog" aria-label="Фото"><img src="${it.photos[ui.lb]}" alt="${esc(it.title)}"><button class="icon-btn" style="right:16px;top:16px" data-act="lbClose" aria-label="Закрыть">${ic('x', 24)}</button>
         ${it.photos.length > 1 ? `<button class="icon-btn" style="left:16px;top:50%" data-act="lbStep" data-d="-1" aria-label="Назад">${ic('left', 24)}</button><button class="icon-btn" style="right:16px;top:50%" data-act="lbStep" data-d="1" aria-label="Вперёд">${ic('right', 24)}</button>` : ''}</div>`;
     }
@@ -1249,7 +1614,7 @@
     ovEl.innerHTML = h;
     typo(ovEl);
     const nw = ovEl.querySelector('.modal-bd, .drawer-bd'); if (nw) nw.scrollTop = top;
-    document.body.classList.toggle('lock', !!(ui.drawer || ui.filters || ui.modal || ui.lb !== null));
+    document.body.classList.toggle('lock', !!(ui.drawer || ui.modal || ui.lb !== null));
   }
   function toast(text, href, label, act) {
     ui.toast = { text, href, label, act }; overlay();
@@ -1257,23 +1622,29 @@
   }
 
   /* ---------- Рендер ---------- */
-  const PAGES = { home: pageHome, catalog: pageCatalog, item: pageItem, cart: pageCart, checkout: pageCheckout, success: pageSuccess, email: pageEmail, reviews: pageSellerReviews };
+  const PAGES = { home: pageHome, catalog: pageCatalog, item: pageItem, cart: pageCart, checkout: pageCheckout, success: pageSuccess, reviews: pageSellerReviews, lk: pageLk, lot: pageLot };
   function itemSticky(it) {
-    if (S.flags.soldOut) return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">Нет в наличии</span></div><a class="btn secondary lg" href="#/catalog">Похожие товары</a></div>`;
+    if (isOwn(it)) return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">${S.flags.soldOut ? 'Нет в наличии' : stockTxt(it)}</span></div>${ownEdit('secondary lg')}</div>`;
+    if (S.flags.soldOut) return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">Нет в наличии</span></div><a class="btn secondary lg" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">Похожие товары</a></div>`;
     const c = inCart(it.id);
-    return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">В наличии: ${it.stock} шт.</span></div>${favBtn(it, S.favs.includes(it.id))}${c ? `${qtyStep(it, c, 'lg')}<a class="icon-btn line lg" href="#/cart" aria-label="Перейти в корзину">${ic('cart', 20)}</a>` : `<button class="btn primary lg" data-act="add" data-id="${it.id}">В корзину</button>`}</div>`;
+    return `<div class="sticky-bar"><div class="sum"><b>${fmt(it.price)}</b><span class="t12 c3">${stockTxt(it)}</span></div>${favBtn(it, S.favs.includes(it.id))}${c ? `${qtyStep(it, c, 'lg')}<a class="icon-btn line lg" href="#/cart" aria-label="Перейти в корзину">${ic('cart', 20)}</a>` : `<button class="btn primary lg" data-act="add" data-id="${it.id}">В корзину</button>`}</div>`;
   }
   function render() {
     const r = route();
     if (r.name === 'item' && r.id) S.viewed = [r.id].concat(S.viewed.filter((x) => x !== r.id)).slice(0, 8);
     const page = (PAGES[r.name] || pageHome)(r);
+    const panelScroll = appEl.querySelector('.cat-side')?.scrollTop || 0;
     appEl.innerHTML = header(r) + `<main>${page}</main>` + footer(r);
-    const hasSticky = (r.name === 'cart' && S.cart.length) || r.name === 'checkout' || r.name === 'item';
+    if (panelScroll && r.name === 'catalog') appEl.querySelector('.cat-side').scrollTop = panelScroll;
+    const lotA = r.name === 'lot' ? (byAny(r.id) || AUCTIONS[0]) : null;
+    const lotBar = lotA ? lotSticky(lotA) : '';
+    const hasSticky = (r.name === 'cart' && S.cart.length) || r.name === 'checkout' || r.name === 'item' || !!lotBar;
     if (r.name === 'item') appEl.insertAdjacentHTML('beforeend', itemSticky(byId(r.id) || ITEMS[0]));
+    if (lotBar) appEl.insertAdjacentHTML('beforeend', lotBar);
     document.body.classList.toggle('has-sticky', !!hasSticky);
     document.body.classList.toggle('menu-open', !!ui.menu);
     document.body.classList.remove('searching');
-    typo(appEl); overlay(); tick(); bindAfter(r); clampFit(); notify();
+    typo(appEl); overlay(); tick(); bindAfter(r); clampFit(); notify(); placeTip();
   }
   function bindAfter(r) {
     if (r.name !== 'item') return;
@@ -1289,13 +1660,22 @@
     }, { passive: true });
   }
   function notify() {
-    if (parent !== window) parent.postMessage({ type: 'mfm-state', route: route().name, flags: S.flags, cart: S.cart.length, hasOrders: !!S.orders }, '*');
+    if (parent !== window) parent.postMessage({ type: 'mfm-state', route: route().name === 'lk' && route().id === 'auctions' ? 'bids' : route().name, flags: S.flags, vars: S.vars, lotSt: S.lotDemo, cart: S.cart.length, hasOrders: !!S.orders }, '*');
   }
   function tick() {
     document.querySelectorAll('[data-end]').forEach((e) => {
       const ms = +e.dataset.end - Date.now(); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
-      e.parentNode.classList.toggle('urgent', ms <= URGENT_MS);
+      (e.closest('[data-tw]') || e.parentNode).classList.toggle('urgent', ms <= URGENT_MS);
       e.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    });
+    document.querySelectorAll('[data-cells]').forEach((w) => {
+      const ms = +w.dataset.cells - Date.now(); const v = { h: Math.floor(ms / 3600000), m: Math.floor(ms / 60000) % 60, s: Math.floor(ms / 1000) % 60 };
+      w.classList.toggle('urgent', ms <= URGENT_MS);
+      w.querySelectorAll('[data-c]').forEach((b) => { b.textContent = String(v[b.dataset.c]).padStart(2, '0'); });
+    });
+    document.querySelectorAll('[data-left]').forEach((e) => {
+      const ms = +e.dataset.left - Date.now(); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60;
+      e.textContent = h >= 24 ? `${Math.floor(h / 24)} д ${h % 24} ч` : h ? `${h} ч ${m} мин` : `${m} мин ${sec} с`;
     });
   }
   setInterval(tick, 1000);
@@ -1342,27 +1722,98 @@
   });
 
   /* ---------- События ---------- */
-  function setNode(v) { S.cat.closed.cat = false; S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
+  function setNode(v) { S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
   const A = {
     menu() { if (window.innerWidth < 1024) { ui.drawer = true; ui.dr = []; overlay(); return; } ui.menu = !ui.menu; render(); },
     drawer() { ui.drawer = !ui.drawer; ui.dr = []; overlay(); },
     dr(el, ev) { ev.preventDefault(); ui.dr = ui.dr.concat(ui.dr.length ? el.dataset.v : +el.dataset.v); overlay(); },
     drBack() { ui.dr = ui.dr.slice(0, -1); overlay(); },
-    mmMore(el) { ui.mmMore[el.dataset.k] = !ui.mmMore[el.dataset.k]; if (ui.drawer || ui.filters) overlay(); else if (ui.menu) repaintMenu(); else render(); },
+    mmMore(el) { ui.mmMore[el.dataset.k] = !ui.mmMore[el.dataset.k]; if (ui.drawer) overlay(); else if (ui.menu) repaintMenu(); else render(); },
     node(el, ev) { ev.preventDefault(); setNode(el.dataset.v || el.dataset.top); },
-    nodef(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.v || null; S.cat.grp = null; save(); if (ui.filters) overlay(); else render(); },
-    nodeg(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.top; S.cat.grp = el.dataset.v; save(); if (ui.filters) overlay(); else render(); },
+    nodef(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.v || null; S.cat.grp = null; save(); render(); },
+    nodeg(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.top; S.cat.grp = el.dataset.v; save(); render(); },
     nodeq(el, ev) { ev.preventDefault(); closeSearch(); setNode(el.dataset.v); },
-    filters() { ui.filters = true; overlay(); },
-    closeFilters() { ui.filters = false; ui.fEdit = null; render(); },
     fEdit(el) {
-      if (window.innerWidth >= 1024) return;
       const a = activeFilters()[+el.dataset.i];
-      const k = a.k === 'f' ? a.g : a.k === 'node' ? 'cat' : a.k === 'price' ? 'price' : (a.k === 'city' || a.k === 'country') ? 'geo' : null;
-      if (!k) return;
-      ui.fEdit = k; ui.filters = true; overlay();
+      const k = a.k === 'f' ? a.g : a.k === 'node' ? 'cat' : ['city', 'country'].includes(a.k) ? 'geo' : a.k;
+      document.querySelector(`[data-filter-group="${k}"]`)?.scrollIntoView({ block: 'nearest' });
     },
+    toLk() { go(S.orders && S.orders.length === 1 ? `#/lk/order/${S.orders[0].no}` : '#/lk/orders'); },
+    contactSave() { toast('Контакт сохранён, его увидит продавец заказа'); },
+    sellerMore() { ui.sellerMore = !ui.sellerMore; render(); },
+    safePay() { lkPatch(ui.modal.pay, { st: 'paid', left: 120 }); ui.modal = null; render(); toast('Заказ оплачен, деньги у сервиса'); },
+    lkTab(el) { ui.lkTab = el.dataset.v; render(); },
+    payOpen(el) { ui.rc = null; ui.modal = { pay: +el.dataset.no }; overlay(); },
+    rcClear() { ui.rc = null; overlay(); },
+    rcSend() {
+      if (!ui.rc || !ui.rc.name) { ui.rc = { err: 'Файл не выбран' }; overlay(); return; }
+      if (ui.rc.err && !ui.rc.retry) { overlay(); return; }
+      ui.rcBusy = true; overlay();
+      setTimeout(() => {
+        ui.rcBusy = false;
+        if (S.flags.rcFail && !ui.rc.retry) { ui.rc = Object.assign({}, ui.rc, { err: 'Сбой загрузки. Попробуйте ещё раз', retry: true }); overlay(); return; }
+        lkPatch(ui.modal.pay, { st: 'paid', left: 48, receipt: ui.rc.name }); ui.modal = null; ui.rc = null; render(); toast('Чек отправлен. Продавец проверит оплату');
+      }, 700);
+    },
+    copy(el) { try { navigator.clipboard.writeText(el.dataset.v); } catch (e) { /* без буфера */ } toast('Скопировано'); },
+    cfm(el) { ui.modal = { cfm: el.dataset.k, no: +el.dataset.no, id: el.dataset.id }; overlay(); },
+    cfmDo(el) {
+      const k = el.dataset.k; const m = ui.modal;
+      if (k === 'got') { lkPatch(m.no, { st: 'got' }); toast('Спасибо! Теперь можно оставить отзыв'); }
+      if (k === 'openDispute') { lkPatch(m.no, { st: 'dispute', stop: 5, by: 'buyer' }); toast('Спор открыт'); }
+      if (k === 'cancel') { lkPatch(m.no, { st: 'cancel', stop: 1, why: 'Вы отменили заказ' }); toast('Заказ отменён'); }
+      if (k === 'askCancel') { lkPatch(m.no, { cancelReq: true }); toast('Запрос отправлен продавцу'); }
+      if (k === 'closeDispute') { lkPatch(m.no, { st: 'sent', stop: undefined, left: 96 }); toast('Спор закрыт'); }
+      if (k === 'dropLot') { S.cart = S.cart.filter((c) => c.id !== m.id); delete S.won[m.id]; save(); toast('Вы отказались от лота'); }
+      ui.modal = null; render();
+    },
+    bidBack() { ui.bidArm = null; render(); },
+    dlOpen(el) { ui.dlNew = null; ui.modal = { dl: +el.dataset.no }; overlay(); },
+    dlSend() { lkPatch(ui.modal.dl, { dlReq: true }); ui.modal = null; render(); toast('Запрос отправлен продавцу'); },
+    revOpen(el) { ui.rv = {}; ui.modal = { rev: +el.dataset.no }; overlay(); },
+    revStar(el) { const t = document.getElementById('revText'); ui.rv = Object.assign({}, ui.rv, { stars: +el.dataset.v, errS: false, text: t ? t.value : '' }); overlay(); },
+    revSend() {
+      const text = document.getElementById('revText').value.trim(); const r = ui.rv || {};
+      if (!r.stars || !text) { ui.rv = Object.assign({}, r, { text, errS: !r.stars, errT: !text }); overlay(); return; }
+      lkPatch(ui.modal.rev, { review: { stars: r.stars, text } }); ui.modal = null; render(); toast('Отзыв опубликован');
+    },
+    bidsOpen(el) { ui.modal = { bidsOf: el.dataset.id }; overlay(); },
+    bidFocus() { const b = document.getElementById('bidBox'); if (b) b.scrollIntoView({ block: 'center' }); const i = document.getElementById('bidI'); if (i) i.focus(); },
+    bidGo() {
+      const a = byAny(route().id); const l = lotInfo(a); const v = parseInt((document.getElementById('bidI').value || '').replace(/\D/g, ''), 10) || 0;
+      ui.bidV = v || ''; ui.bidErr = '';
+      if (v < l.next) ui.bidErr = `Ставка должна быть не меньше ${fmt(l.next)}`;
+      else if (v > MAX_BET) ui.bidErr = `Ставка должна быть не больше ${fmt(MAX_BET)}`;
+      if (ui.bidErr) { render(); return; }
+      if (S.flags.noEmail) { ui.mailSent = false; ui.mailErr = ''; ui.modal = { mail: v }; overlay(); return; }
+      ui.bidArm = v; render(); const c = document.getElementById('bidOk'); if (c) c.focus();
+    },
+    bidDo() {
+      const a = byAny(route().id); const ls = (S.lot || {})[a.id] || {}; const v = ui.bidArm;
+      S.lot = S.lot || {}; S.lot[a.id] = Object.assign({}, ls, { st: 'lead', my: v, price: v, n: (ls.n || 0) + 1 }); S.lotDemo = 'lead';
+      ui.bidArm = null; ui.bidV = undefined; save(); render(); toast('Ваша ставка учтена');
+    },
+    autoT() { ui.autoOpen = !ui.autoOpen; render(); },
+    autoGo() {
+      const a = byAny(route().id); const l = lotInfo(a); const v = parseInt(document.getElementById('autoI').value.replace(/\D/g, ''), 10) || 0;
+      if (v < l.next) { ui.autoErr = `Автоставка должна быть не меньше ${fmt(l.next)}`; render(); return; }
+      ui.autoErr = ''; ui.autoOpen = false; S.lot = S.lot || {}; S.lot[a.id] = Object.assign({}, l.ls, { auto: v, st: l.ls.st || 'lead', my: l.ls.my || l.next, price: l.ls.price || l.next, n: (l.ls.n || 0) + (l.ls.my ? 0 : 1) }); save(); render(); toast('Автоставка сохранена');
+    },
+    blitz() { const a = byAny(route().id); winLot(a.id, LOTX[a.id].blitz); S.lot = S.lot || {}; S.lot[a.id] = { st: 'won', my: LOTX[a.id].blitz, price: LOTX[a.id].blitz }; save(); render(); toast('Лот ваш и уже в корзине'); },
+    mailSend() { ui.mailSent = true; overlay(); },
+    mailDo() {
+      const v = (document.getElementById('mailCode').value || '').trim();
+      if (v !== '1234') { ui.mailErr = 'Неверный код'; overlay(); return; }
+      const amt = ui.modal.mail; S.flags.noEmail = false; ui.mailErr = ''; ui.modal = null; ui.bidArm = amt; save(); render(); toast('Почта подтверждена');
+    },
+    wonGo(el) { winLot(el.dataset.id, +el.dataset.p); save(); go('#/cart'); },
+    bidTab(el) { ui.bidTab = el.dataset.v; render(); },
     login() { ui.drawer = false; ui.modal = { login: '' }; overlay(); },
+    loginDo() { ui.modal = null; setRole('buyer'); save(); render(); toast('Вы вошли как User1'); },
+    logout() { ui.modal = null; setRole('guest'); save(); render(); },
+    profile(el) { const r = el.getBoundingClientRect(); ui.drawer = false; ui.modal = { profile: { top: Math.round(r.bottom + 4), right: Math.max(8, Math.round(window.innerWidth - r.right)) } }; overlay(); },
+    sub(el) { const k = el.dataset.id; S.subs = S.subs || []; const on = S.subs.includes(k); S.subs = on ? S.subs.filter((x) => x !== k) : S.subs.concat(k); save(); render(); toast(on ? 'Подписка отменена' : 'Новые объявления продавца будут приходить в уведомления'); },
+    blk(el) { const k = el.dataset.id; S.blks = S.blks || []; const on = S.blks.includes(k); S.blks = on ? S.blks.filter((x) => x !== k) : S.blks.concat(k); save(); render(); toast(on ? 'Продавец разблокирован' : 'Объявления продавца больше не будут вам показываться'); },
     loginFor(el) { ui.modal = { login: el.dataset.text }; overlay(); },
     closeModal() { ui.modal = null; overlay(); },
     report() { ui.modal = { report: true }; overlay(); },
@@ -1371,15 +1822,15 @@
     tab(el, ev) { ev.preventDefault(); S.cat.tab = el.dataset.v; save(); go('#/catalog'); },
     comment(el) {
       const v = document.getElementById('cmText').value.trim(); if (!v) return;
-      const id = el.dataset.id; const base = S.comments[id] || (id === 'strudd' ? COMMENTS.slice() : []);
-      S.comments[id] = base.concat({ who: 'User1', date: 'Только что', text: v, replies: [] }); save(); render();
+      const id = el.dataset.id; const base = cmList(id).slice();
+      S.comments[id] = base.concat({ who: myName(), seller: isOwn(byAny(id)), date: 'Только что', text: v, replies: [] }); save(); render();
     },
     replyT(el) { const i = +el.dataset.i; ui.replyTo = ui.replyTo === i ? null : i; render(); },
     replySend(el) {
       const v = document.getElementById('cmReply').value.trim(); if (!v) return;
       const id = el.dataset.id; const i = +el.dataset.i;
-      const list = JSON.parse(JSON.stringify(S.comments[id] || (id === 'strudd' ? COMMENTS : [])));
-      list[i].replies = (list[i].replies || []).concat({ who: 'User1', date: 'Только что', text: v });
+      const list = JSON.parse(JSON.stringify(cmList(id)));
+      list[i].replies = (list[i].replies || []).concat({ who: myName(), seller: isOwn(byAny(id)), date: 'Только что', text: v });
       S.comments[id] = list; ui.replyTo = null; save(); render();
     },
     certT() { ui.certOpen = !ui.certOpen; ui.certErr = ''; render(); },
@@ -1400,25 +1851,26 @@
     goHome(el, ev) { ev.preventDefault(); go('#/'); },
     tagq(el) { toast(`Выдача по тегу ${el.dataset.v}: одинаковые теги объединяем`); },
     viewedT() { ui.viewedMore = !ui.viewedMore; render(); },
-    homePop() { S.cat = Object.assign(DEFCAT(), { closed: S.cat.closed, sort: 'pop' }); save(); go('#/catalog'); },
-    resetCat() { const closed = S.cat.closed; S.cat = Object.assign(DEFCAT(), { closed }); save(); if (ui.filters) overlay(); render(); },
+    homePop() { S.cat = Object.assign(DEFCAT(), { sort: 'pop' }); save(); go('#/catalog'); },
+    resetCat() { S.cat = DEFCAT(); save(); render(); },
     dropF(el) {
       const a = activeFilters()[+el.dataset.i]; const c = S.cat;
       if (a.k === 'node') c.node = null; if (a.k === 'q') c.q = ''; if (a.k === 'price') { c.min = ''; c.max = ''; } if (a.k === 'city') c.city = 'Все'; if (a.k === 'country') c.country = 'Все';
       if (a.k === 'f') c.f[a.g] = c.f[a.g].filter((x) => x !== a.v);
       save(); render();
     },
-    fltT(el) { S.cat.closed[el.dataset.k] = !fClosed(el.dataset.k); save(); if (ui.filters) overlay(); else render(); },
-    saveSearch() { ui.filters = false; ui.modal = { login: 'Войдите, чтобы сохранить поиск: он появится в избранном, а новые объявления по нему придут в уведомления' }; overlay(); },
-    fav(el, ev) { ev.preventDefault(); const id = el.dataset.id; const i = S.favs.indexOf(id); if (i >= 0) S.favs.splice(i, 1); else S.favs.push(id); save(); render(); },
+    fltApply() { ui.applied = null; ui.fTip = null; render(); },
+    searchClear(el) { const f = el.closest('form'); const had = !!S.cat.q; f.q.value = ''; f.classList.remove('dirty'); S.cat.q = ''; save(); if (had && route().name === 'catalog') render(); const n = [...document.querySelectorAll('input[name=q]')].find((i) => i.offsetParent); if (n) n.focus(); },
+    saveSearch() { if (isAuth()) { render(); toast('Поиск сохранён: он появится в избранном'); return; } ui.modal = { login: 'Войдите, чтобы сохранить поиск: он появится в избранном, а новые объявления по нему придут в уведомления' }; overlay(); },
+    fav(el, ev) { ev.preventDefault(); if (!isAuth()) { ui.modal = { login: 'Войдите, чтобы сохранять товары в избранное' }; overlay(); return; } const id = el.dataset.id; const i = S.favs.indexOf(id); if (i >= 0) S.favs.splice(i, 1); else S.favs.push(id); save(); render(); },
     homeTab(el) { ui.homeTab = el.dataset.v; render(); },
     foot(el) { ui.footOpen[el.dataset.k] = !ui.footOpen[el.dataset.k]; render(); },
     toTop() { window.scrollTo(0, 0); },
     photo(el) { setPhoto(+el.dataset.i); },
-    photoStep(el) { const n = byId(route().id).photos.length; setPhoto((ui.photo + (+el.dataset.d) + n) % n); },
+    photoStep(el) { const n = byAny(route().id).photos.length; setPhoto((ui.photo + (+el.dataset.d) + n) % n); },
     lb(el) { ui.lb = +el.dataset.i; overlay(); },
     lbClose() { ui.lb = null; overlay(); },
-    lbStep(el) { const n = byId(route().id).photos.length; ui.lb = (ui.lb + (+el.dataset.d) + n) % n; overlay(); },
+    lbStep(el) { const n = byAny(route().id).photos.length; ui.lb = (ui.lb + (+el.dataset.d) + n) % n; overlay(); },
     qty(el) { ui.qty += +el.dataset.d; render(); },
     add(el) { addCart(el.dataset.id, ui.qty); ui.qty = 1; S.notice = null; save(); render(); if (window.innerWidth >= 1024) toast('Товар в корзине', '#/cart', 'Перейти'); },
     addc(el, ev) {
@@ -1465,10 +1917,11 @@
     const tog = t.closest('[data-dd-toggle]');
     if (tog) { const m = tog.parentNode.querySelector('.dd-menu'); const was = m.hidden; closeDD(); m.hidden = !was; tog.setAttribute('aria-expanded', String(was)); if (was) { const s = m.querySelector('[data-dd-search]'); if (s) s.focus(); } return; }
     const opt = t.closest('[data-dd-val]');
-    if (opt) { const id = opt.closest('[data-dd]').dataset.dd; DD[id](opt.dataset.ddVal); save(); closeDD(); if (ui.filters || ui.drawer) overlay(); else render(); return; }
+    if (opt) { const id = opt.closest('[data-dd]').dataset.dd; DD[id](opt.dataset.ddVal); save(); closeDD(); if (ui.drawer) overlay(); else render(); return; }
     if (t.closest('[data-dd-search]')) return;
     closeDD();
     const el = t.closest('[data-act]');
+    if (el && ui.applied && !['fltApply', 'fav', 'addc', 'cartQty', 'soon'].includes(el.dataset.act)) { ui.applied = null; ui.fTip = null; }
     if (!t.closest('.hdr-search') && !t.closest('#sp')) closeSearch();
     if (!el) {
       if (ui.menu && !t.closest('#mm') && !t.closest('.brand-cat')) { ui.menu = false; render(); }
@@ -1490,15 +1943,25 @@
       });
       return;
     }
+    if (t.id === 'rcFile') {
+      const f = t.files[0]; if (!f) return;
+      const ext = (f.name.split('.').pop() || '').toLowerCase();
+      if (!['jpg', 'jpeg', 'png', 'pdf'].includes(ext)) ui.rc = { err: 'Этот формат не подходит. Нужен JPG, PNG или PDF' };
+      else if (f.size > 20 * 1048576) ui.rc = { name: f.name, size: sizeTxt(f.size), err: 'Файл больше 20 МБ' };
+      else ui.rc = { name: f.name, size: sizeTxt(f.size) };
+      overlay(); return;
+    }
     if (t.dataset.actChg === 'line') { inCart(t.dataset.id).on = t.checked; save(); render(); return; }
     if (t.dataset.actChg === 'all') { S.cart.forEach((c) => { c.on = t.checked; }); save(); render(); return; }
+    if (t.dataset.actChg === 'safe') { if (t.checked) S.co.pay[t.dataset.s] = 'safe'; else delete S.co.pay[t.dataset.s]; save(); render(); return; }
+    if (t.name === 'dlNew') { ui.dlNew = t.value; overlay(); return; }
     if (t.dataset.actChg === 'dl') { S.co.dl[t.dataset.s] = t.value; save(); render(); return; }
     if (t.dataset.actChg === 'pay') { S.co.pay[t.dataset.s] = t.value; save(); render(); return; }
     if (t.dataset.actChg === 'flt') {
-      const g = t.dataset.g; const cur = S.cat.f[g] || []; S.cat.f[g] = t.checked ? cur.concat(t.value) : cur.filter((x) => x !== t.value);
-      save(); if (ui.filters) overlay(); else render(); return;
+      const g = t.dataset.g; pend(`.cat-side input[data-g="${g}"][value="${t.value.replace(/"/g, '\\"')}"]`); const cur = S.cat.f[g] || []; S.cat.f[g] = t.checked ? cur.concat(t.value) : cur.filter((x) => x !== t.value);
+      save(); render(); return;
     }
-    if (t.dataset.cat) { S.cat[t.dataset.cat] = t.value.replace(/\D/g, ''); save(); if (ui.filters) overlay(); else render(); }
+    if (t.dataset.cat) { pend(`.cat-side [data-cat=${t.dataset.cat}]`); S.cat[t.dataset.cat] = t.value.replace(/\D/g, ''); save(); render(); }
   });
   const phoneMask = (v) => {
     let d = v.replace(/\D/g, ''); if (d[0] === '8') d = '7' + d.slice(1); if (d && d[0] !== '7') d = '7' + d; d = d.slice(0, 11);
@@ -1534,6 +1997,8 @@
       if (ui.touched[t.name] || ui.submitted) refreshField(t.name, t);
     }
   });
+  document.addEventListener('input', (ev) => { if (ev.target.name === 'q' && ev.target.closest('.hdr-search')) ev.target.closest('.hdr-search').classList.toggle('dirty', ev.target.value.trim() !== S.cat.q); if (ev.target.id === 'lkQ') { ui.lkQ = ev.target.value; const p = ev.target.selectionStart; render(); const n = document.getElementById('lkQ'); if (n) { n.focus(); n.setSelectionRange(p, p); } } if (ev.target.id === 'bidI') { ui.bidV = ev.target.value.replace(/\D/g, ''); } });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.id === 'bidI') { ev.preventDefault(); const b = document.querySelector('[data-act=bidGo]'); if (b) b.click(); } });
   document.addEventListener('focusin', (ev) => {
     const t = ev.target;
     if (t.id === 'city') { ui.cityOpen = true; document.getElementById('cityList').innerHTML = cityList(t.value); }
@@ -1549,7 +2014,7 @@
     ev.preventDefault(); S.cat.q = f.q.value.trim(); S.cat.node = null; closeSearch(); save(); go('#/catalog');
   });
   document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') { closeDD(); closeSearch(); ui.modal = null; ui.filters = false; ui.drawer = false; ui.lb = null; if (ui.menu) { ui.menu = false; render(); } else overlay(); }
+    if (ev.key === 'Escape') { closeDD(); closeSearch(); ui.modal = null; ui.drawer = false; ui.lb = null; if (ui.menu) { ui.menu = false; render(); } else overlay(); }
   });
   document.addEventListener('error', (ev) => {
     const t = ev.target;
@@ -1559,10 +2024,11 @@
     }
   }, true);
 
+  window.addEventListener('scroll', placeTip, { passive: true });
+  document.addEventListener('scroll', placeTip, { passive: true, capture: true });
   window.addEventListener('hashchange', () => {
-    ui.menu = false; ui.drawer = false; ui.toast = null; ui.photo = 0; ui.tab = 'desc'; ui.descOpen = false; ui.qty = 1; ui.lb = null; ui.crumbs = false; ui.revSort = 'new';
+    ui.applied = null; ui.fTip = null; ui.bidArm = null; ui.bidV = undefined; ui.bidErr = ''; ui.menu = false; ui.drawer = false; ui.toast = null; ui.photo = 0; ui.tab = 'desc'; ui.descOpen = false; ui.qty = 1; ui.lb = null; ui.crumbs = false; ui.revSort = 'new';
     if (route().name === 'checkout') { S.notice = null; ui.coStep = 1; }
-    if (route().name === 'catalog') S.cat.closed.cat = false;
     window.scrollTo(0, 0); render();
   });
 
@@ -1573,20 +2039,37 @@
       if (m.hash === '#/checkout' && !S.cart.length) preset('one');
       go(m.hash);
     }
-    if (m.type === 'mfm-preset') { preset(m.name); save(); render(); }
+    if (m.type === 'mfm-preset') {
+      if (m.name === 'cash') { preset('one'); fillForm(); ui.submitted = false; groups(true).forEach((g) => { S.co.city = S.co.cityTxt = g.seller.city; S.co.dl[g.sid] = 'pickup'; S.co.pay[g.sid] = 'cash'; }); } else preset(m.name);
+      save(); render();
+    }
     if (m.type === 'mfm-flag') {
-      S.flags[m.key] = m.value;
+      if (m.key === 'role') setRole(m.value); else S.flags[m.key] = m.value;
       if (m.key === 'itemOut' && m.value && !S.cart.some((c) => c.id === 'trukk')) S.cart.push({ id: 'trukk', qty: 1, on: true });
       if (m.key === 'partial' && m.value) { const c = inCart('strudd'); if (c) c.qty = Math.max(c.qty, 2); else S.cart.push({ id: 'strudd', qty: 2, on: true }); }
       if (m.key === 'minSum' && m.value) S.cart = [{ id: 'lutazy', qty: 1, on: true }];
       if (m.key === 'fail') { S.banner = null; S.co.surcharge = null; }
       save(); render();
     }
+    if (m.type === 'mfm-lot') {
+      const id = route().id; const a = byAny(id); if (a) {
+        const p = a.price; const T = { live: {}, lead: { st: 'lead', my: p }, outbid: { st: 'outbid', my: p - 100 }, auto: { st: 'lead', my: p, auto: p + 500 }, won: { st: 'won', my: p }, lost: { st: 'lost', my: p - 100 }, reserve: { st: 'reserve', my: p }, ended: { st: 'ended' } };
+        S.lot = S.lot || {}; S.lot[id] = T[m.value]; S.lotDemo = m.value; ui.bidV = undefined; ui.bidErr = '';
+        if (m.value === 'won') winLot(id, p); else if (S.won && S.won[id]) { delete S.won[id]; S.cart = S.cart.filter((c) => c.id !== id); }
+        save(); render();
+      }
+    }
+    if (m.type === 'mfm-rc') {
+      ui.rc = { ok: { name: 'чек-оплаты.pdf', size: '340 КБ' }, big: { name: 'скан-чека.pdf', size: '21,0 МБ', err: 'Файл больше 20 МБ' }, bad: { err: 'Этот формат не подходит. Нужен JPG, PNG или PDF' } }[m.value];
+      if (!ui.modal || !ui.modal.pay) ui.modal = { pay: 464811 };
+      overlay();
+    }
+    if (m.type === 'mfm-var') { S.vars = Object.assign({}, S.vars, { [m.key]: m.value }); ui.applied = null; ui.fTip = null; save(); render(); }
     if (m.type === 'mfm-fill') { if (!S.cart.length) preset('one'); fillForm(); ui.submitted = false; save(); render(); }
     if (m.type === 'mfm-empty-submit') { S.form = {}; S.co = DEF().co; save(); render(); setTimeout(submit, 0); }
     if (m.type === 'mfm-reset') { S = DEF(); save(); Object.assign(ui, { submitted: false, touched: {}, opened: {} }); go('#/'); render(); }
   });
 
-  S.cat.closed.cat = false;
+
   render();
 })();

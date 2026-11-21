@@ -21,7 +21,7 @@
   };
 
   const SELLERS = {
-    pocket: { name: 'PocketSized Prints', pro: true, rank: 36, rating: 4.97, reviews: 388, pos: 385, neg: 3, city: 'Уфа', stazh: '3 года', payWait: '3 дня', shipWait: '15 дней', late: 13, deliveries: ['pickup', 'tk', 'post', 'yd'], pay: ['card', 'cash'], autoConfirm: true },
+    pocket: { name: 'PocketSized Prints', pro: true, rank: 36, rating: 4.97, reviews: 388, followers: 13, done: 231, purchases: 115, pos: 385, neg: 3, city: 'Уфа', stazh: '3 года', payWait: '3 дня', shipWait: '15 дней', late: 13, deliveries: ['pickup', 'tk', 'post', 'yd'], pay: ['card', 'cash'], autoConfirm: true },
     tema: { name: 'Tema1992', pro: false, rating: 5.0, reviews: 1, pos: 1, neg: 0, city: 'Владимир', stazh: '6 лет', done: 3, payWait: '3 дня', shipWait: '10 дней', late: 0, deliveries: ['pickup', 'tk', 'post', 'yd'], pay: ['card', 'cash'], minSum: 2000 /* пример */ },
     baphomet: { name: 'Baphomet', pro: true, rating: 4.93, reviews: 111, pos: 108, neg: 3, city: 'Санкт-Петербург', stazh: '7 лет', done: 308, payWait: '3 дня', shipWait: '5 дней', late: 0, deliveries: ['post', 'yd'], pay: ['card'] },
     richard: { name: 'RichardZamok', pro: false, rating: 0, reviews: 0, pos: 0, neg: 0, city: 'Москва', stazh: '14 дней', done: 0, payWait: '3 дня', shipWait: '10 дней', late: 0, deliveries: ['pickup', 'post', 'cdek'], pay: ['card'] },

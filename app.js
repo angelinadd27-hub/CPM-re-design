@@ -2,6 +2,8 @@
 (function () {
   const { DELIVERY, PAYWAY, SELLERS, ITEMS, AUCTIONS, REVIEWS, CATEGORIES, TAGS, SELLER_TYPES, CITIES, PVZ } = window.MFM;
   const MENU = window.MFM_MENU || [];
+  const navigationSections = new Set(['Клубы', 'Афиша мероприятий', 'Подарочные сертификаты']);
+  const catalogCategories = MENU.filter(section => !navigationSections.has(section.t));
   const DESC = window.MFM_DESC || {};
   const HOME = window.MFM_HOME || { cats: [], clubs: [], events: [] };
   const SITE = 'https://minifreemarket.com';
@@ -91,16 +93,33 @@
   const DEFCAT = () => ({ tab: 'all', node: null, sort: 'new', per: 24, q: '', min: '', max: '', country: 'Все', city: 'Все', f: {}, view: 'two' });
   const DEF = () => ({
     cart: [], favs: [], viewed: [], lang: 'RUS', cur: 'RUB',
-    form: {}, co: { city: '', cityTxt: '', dl: {}, pay: {}, pvz: {}, comment: {}, promo: {} },
+    form: {}, co: { city: '', cityTxt: '', dl: {}, pay: {}, safe: {}, pvz: {}, comment: {}, promo: {}, certificates: [] },
     flags: { emailExists: false, autoConfirm: false, fail: 'none', itemOut: false, partial: false, minSum: false, soldOut: false, role: 'guest' },
     comments: {},
     cat: DEFCAT(), orders: null, banner: null, notice: null,
   });
   let S = DEF();
   try { const raw = sessionStorage.getItem(KEY); if (raw) { S = Object.assign(DEF(), JSON.parse(raw)); S.cat = Object.assign(DEFCAT(), S.cat); } } catch (e) { /* без хранилища работаем из памяти */ }
+  if (navigationSections.has(S.cat.node)) { S.cat.node = null; S.cat.grp = null; }
+  // Older sessions stored one string per seller and one certificate for the basket.
+  S.co = Object.assign(DEF().co, S.co);
+  for (const [seller, codes] of Object.entries(S.co.promo)) {
+    S.co.promo[seller] = [...new Set([].concat(codes).filter(Boolean))];
+  }
+  S.co.certificates = [...new Set(S.co.certificates.concat(S.co.cert || []).filter(Boolean))];
+  delete S.co.cert;
+  for (const [sid, method] of Object.entries(S.co.pay)) {
+    if (method === 'safe') {
+      S.co.safe[sid] ??= true;
+      S.co.pay[sid] = 'card';
+    }
+    if (method === 'cash') S.co.safe[sid] = false;
+  }
   const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* пропускаем */ } };
 
-  const ui = { menu: false, l1: 0, l2: null, mmMore: {}, drawer: false, dr: [], modal: null, photo: 0, tab: 'desc', descOpen: false, lb: null, toast: null, opened: {}, cityOpen: false, touched: {}, submitted: false, loading: false, qty: 1, promoErr: {}, tagsOpen: false, relOff: {}, homeTab: 'Все', footOpen: {}, clamp: {}, crumbs: false, revSort: 'new', coStep: 1, certOpen: false, certErr: '' };
+  const ui = { menu: false, l1: 0, l2: null, mmMore: {}, drawer: false, dr: [], modal: null, photo: 0, tab: 'desc', descOpen: false, lb: null, toast: null, opened: {}, cityOpen: false, touched: {}, submitted: false, loading: false, qty: 1, tagsOpen: false, relOff: {}, homeTab: 'Все', footOpen: {}, clamp: {}, crumbs: false, revSort: 'new', coStep: 1, codeDraft: '', codeError: '', chooseSeller: false, codeStatus: '' };
+  const catalogDesktop = window.matchMedia('(min-width: 1024px)');
+  const mobileFilterSections = {};
   let toastT = null;
 
   /* ---------- Безопасная сделка: комиссия примерная ---------- */
@@ -116,6 +135,7 @@
   const isOwn = (it) => role() === 'seller' && !!it && it.seller === OWN_SELLER;
   const myName = () => (role() === 'seller' ? SELLERS[OWN_SELLER].name : 'User1');
   function setRole(r) {
+    ui.recipientDraft = null;
     S.flags.role = r; ui.replyTo = null;
     if (r === 'guest') { S.favs = []; S.form = {}; S.lot = {}; S.lotDemo = 'live'; S.cart = S.cart.filter((c) => !(S.won && S.won[c.id])); S.won = {}; }
     if (r === 'seller') {
@@ -148,9 +168,28 @@
   const minProblem = (g) => (S.flags.minSum && g.seller.minSum && g.sum < g.seller.minSum ? g.seller.minSum - g.sum : 0);
 
   function preset(name) {
+    resetCodeEntry();
     if (name === 'empty') S.cart = [];
     if (name === 'one') S.cart = [{ id: 'strudd', qty: 1, on: true }];
     if (name === 'two') S.cart = [{ id: 'strudd', qty: 1, on: true }, { id: 'trukk', qty: 1, on: true }];
+    if (name === 'multi' || name === 'cash') {
+      S.cart = [{ id: 'strudd', qty: 1, on: true }, { id: 'assassins', qty: 2, on: true }];
+      S.co = DEF().co;
+      fillForm();
+      S.flags.fail = 'none';
+      ui.coStep = 1;
+      ui.recipientDraft = null;
+      ui.opened = {};
+      if (name === 'cash') {
+        S.co.city = S.co.cityTxt = SELLERS.pocket.city;
+        S.co.dl.pocket = 'pickup'; S.co.pay.pocket = 'cash';
+      }
+    }
+    if (name === 'twoPro') {
+      S.co = DEF().co;
+      S.cart = [{ id: 'assassins', qty: 1, on: true }, { id: 'zeratul', qty: 1, on: true }];
+      fillForm();
+    }
     if (name === 'three') S.cart = [{ id: 'strudd', qty: 1, on: true }, { id: 'assassins', qty: 2, on: true }, { id: 'trukk', qty: 1, on: true }];
     S.flags.itemOut = S.flags.partial = S.flags.minSum = false;
     ui.submitted = false; ui.touched = {}; S.banner = null; S.notice = null;
@@ -160,7 +199,7 @@
     S.co.city = S.co.cityTxt = 'Москва';
     groups(true).forEach((g) => {
       const d = g.seller.deliveries.includes('post') ? 'post' : g.seller.deliveries.includes('tk') ? 'tk' : g.seller.deliveries[0];
-      S.co.dl[g.sid] = d; if (S.co.pay[g.sid] !== 'safe') S.co.pay[g.sid] = 'card';
+      S.co.dl[g.sid] = d; S.co.pay[g.sid] = 'card';
       if (DELIVERY[d].needs === 'pvz') S.co.pvz[g.sid] = PVZ[0].id;
     });
   }
@@ -206,8 +245,9 @@
   /* ---------- Шапка ---------- */
   const rating = (s) => (s.reviews ? `${STAR}<span class="sb">${s.rating.toFixed(2)}</span>` : '<span class="tag mute">Новый продавец</span>');
   const logoHtml = () => '<a class="logo" href="#/" aria-label="Свободный Рынок Миниатюр, на главную"><img src="assets/logo.png" alt="СРМ"></a>';
+  const searchExamples = ['Warhammer 40.000', 'Kill team', 'Dice', 'Magic: The Gathering', 'Краски Citadel', 'Террейн', 'LEGO'];
   const searchForm = () => `<form class="hdr-search" data-form="search" role="search" autocomplete="off">
-      <input name="q" type="search" placeholder=" " value="${esc(S.cat.q)}" aria-label="Поиск">
+      <input name="q" type="search" placeholder="${searchExamples[0]}" value="${esc(S.cat.q)}" aria-label="Поиск">
       <button type="submit" class="hdr-search-go" aria-label="Найти">${ic('search')}</button>
       <button type="button" class="hdr-search-x" data-act="searchClear" aria-label="Очистить">${ic('x', 18)}</button><button type="submit" class="hdr-search-do">Найти</button>
     </form>`;
@@ -276,7 +316,7 @@
   function repaintMenu() { const el = document.getElementById('mm'); if (!el) return; const s = el.querySelector('.mm-c2'); const top = s ? s.scrollTop : 0; el.innerHTML = megaMenu(); typo(el); const n = el.querySelector('.mm-c2'); if (n) n.scrollTop = top; }
 
   /* ---------- Поиск ---------- */
-  const CATS_FLAT = (() => { const o = []; MENU.forEach((m) => { o.push(m.t); m.groups.forEach((g) => g.items.forEach((i) => { o.push(i.t); (i.sub || []).forEach((s) => o.push(s)); })); }); return o.filter((v, i, a) => a.indexOf(v) === i); })();
+  const CATS_FLAT = (() => { const o = []; catalogCategories.forEach((m) => { o.push(m.t); m.groups.forEach((g) => g.items.forEach((i) => { o.push(i.t); (i.sub || []).forEach((s) => o.push(s)); })); }); return o.filter((v, i, a) => a.indexOf(v) === i); })();
   function spCard(it) {
     const c = inCart(it.id);
     return `<article class="sp-c"><a href="#/item/${it.id}"><img src="${it.img}" alt=""><span class="sp-pr">${fmt(it.price)}</span><span class="sp-ct">${esc(it.title)}</span></a>
@@ -324,16 +364,36 @@
 
   /* Примеры категорий печатаются в поле поиска, как на сайте */
   (function typePlaceholder() {
-    const words = ['Warhammer 40.000', 'Kill team', 'Dice', 'Magic: The Gathering', 'Краски Citadel', 'Террейн', 'LEGO'];
-    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    let w = 0; let c = 0; let del = false; let wait = 0;
-    setInterval(() => {
-      if (wait > 0) { wait -= 1; return; }
-      const word = words[w]; c += del ? -1 : 1;
-      if (c > word.length) { del = true; c = word.length; wait = 18; return; }
-      if (c < 0) { del = false; c = 0; w = (w + 1) % words.length; wait = 3; return; }
-      document.querySelectorAll('input[name=q]').forEach((i) => { if (document.activeElement !== i) i.placeholder = word.slice(0, c) || ' '; });
-    }, 90);
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let timer;
+    function syncMotion() {
+      clearInterval(timer);
+      let index = 0;
+      let length = searchExamples[0].length;
+      let deleting = true;
+      let pause = 18;
+      function show(text) {
+        const input = document.querySelector('.hdr-search input');
+        if (input && !input.value && document.activeElement !== input) input.placeholder = text;
+      }
+      show(searchExamples[0]);
+      if (motion.matches) return;
+      timer = setInterval(() => {
+        if (pause > 0) { pause--; return; }
+        const word = searchExamples[index];
+        length += deleting ? -1 : 1;
+        if (length > word.length) {
+          deleting = true; length = word.length; pause = 18;
+        } else if (length < 0) {
+          deleting = false; length = 0; pause = 3;
+          index = (index + 1) % searchExamples.length;
+        } else {
+          show(word.slice(0, length) || ' ');
+        }
+      }, 90);
+    }
+    motion.addEventListener('change', syncMotion);
+    syncMotion();
   }());
 
   /* ---------- Подвал как на сайте ---------- */
@@ -450,11 +510,11 @@
         <div class="adv-i hide-m-only">${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span></div>
       </div></section>
       <section class="band first"><div class="wrap">
-        <div class="sec-hd"><h2 class="sec-t">Текущие аукционы</h2><a class="link row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 14)}</a></div>
+        <div class="sec-hd"><h2 class="sec-t">Текущие аукционы</h2><a class="link row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 16)}</a></div>
         <div class="scroller">${AUCTIONS.map(acard).join('')}</div>
       </div></section>
       <section class="band white"><div class="wrap">
-        <div class="sec-hd"><h2 class="sec-t">Популярные категории</h2><a class="link row-l" href="#/catalog" data-act="node" data-top="" data-v="">Все категории ${ic('right', 14)}</a></div>
+        <div class="sec-hd"><h2 class="sec-t">Популярные категории</h2><a class="link row-l" href="#/catalog" data-act="node" data-top="" data-v="">Посмотреть все ${ic('right', 16)}</a></div>
         <div class="tiles">${HOME.cats.map((c) => `<a class="tile" href="#/catalog" data-act="nodeq" data-v="${esc(c.t)}"><img loading="lazy" src="${c.img}" alt=""><span>${esc(c.t)}</span></a>`).join('')}</div>
       </div></section>
 
@@ -467,20 +527,20 @@
       </div></section>
 
       <section class="band band-next"><div class="wrap">
-        <div class="sec-hd"><h2 class="sec-t">Популярные объявления</h2><a class="link row-l" href="#/catalog" data-act="homePop">Посмотреть все ${ic('right', 14)}</a></div>
+        <div class="sec-hd"><h2 class="sec-t">Популярные объявления</h2><a class="link row-l" href="#/catalog" data-act="homePop">Посмотреть все ${ic('right', 16)}</a></div>
         <div class="grid">${popular.map((x) => pcard(x)).join('')}</div>
       </div></section>
       ${howBlock('band white')}
 
       <section class="band"><div class="wrap">
-        <div class="sec-hd"><h2 class="sec-t">Продавцы с лучшими отзывами</h2><a class="link row-l" href="#/" ${soon('Раздел «Продавцы» соберём отдельным блоком')}>Все продавцы ${ic('right', 14)}</a></div>
-        <div class="sell-row">${sellers.map(([k, ids]) => { const s = SELLERS[k]; return `<article class="sell-c"><a href="#/" ${soon('Страницу продавца соберём отдельным блоком')} class="sell-h"><span class="ava">${esc(s.name[0])}</span><span class="sell-b"><span class="row"><span class="sb">${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}</span><span class="t12 c2">г.\u00a0${esc(s.city)}</span><span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span></span></a><div class="sell-items">${ids.map((id) => { const o = byAny(id); return `<a href="${byId(id) ? `#/item/${id}` : '#/'}" ${byId(id) ? '' : soon('Лот и ставка это сценарий аукциона, соберём его следующим')}><img loading="lazy" src="${o.img}" alt=""><span class="sell-p">${fmt(o.price)}</span><span class="sell-t">${esc(o.title)}</span></a>`; }).join('')}</div></article>`; }).join('')}</div>
+        <div class="sec-hd"><h2 class="sec-t">Продавцы с лучшими отзывами</h2><a class="link row-l" href="#/" ${soon('Раздел «Продавцы» соберём отдельным блоком')}>Посмотреть все ${ic('right', 16)}</a></div>
+        <div class="sell-row">${sellers.map(([k, ids]) => { const s = SELLERS[k]; return `<article class="sell-c"><a href="#/" ${soon('Страницу продавца соберём отдельным блоком')} class="sell-h"><span class="ava">${esc(s.name[0])}</span><span class="sell-b"><span class="row"><span class="sb">${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}</span><span class="t12 c2">г.\u00a0${esc(s.city)}</span><span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span></span></a><div class="sell-items">${ids.map((id) => { const o = byAny(id); return `<a href="#/${AUCTIONS.some(a => a.id === id) ? 'lot' : 'item'}/${id}"><img loading="lazy" src="${o.img}" alt=""><span class="sell-p">${fmt(o.price)}</span><span class="sell-t">${esc(o.title)}</span></a>`; }).join('')}</div></article>`; }).join('')}</div>
       </div></section>
 
       <section class="band white"><div class="wrap comm">
-        <div><div class="sec-hd"><h2 class="sec-t">Клубы</h2><a class="link row-l" href="#/" ${soon('Клубы соберём отдельным блоком')}>Все клубы ${ic('right', 14)}</a></div>
+        <div><div class="sec-hd"><h2 class="sec-t">Клубы</h2><a class="link row-l" href="#/" ${soon('Клубы соберём отдельным блоком')}>Посмотреть все ${ic('right', 16)}</a></div>
           <ul class="comm-l">${clubs.map((c) => `<li><a href="#/" ${soon('Страницу клуба соберём отдельным блоком')}><img loading="lazy" src="${c.img}" alt=""><span><b>${esc(c.t)}</b><span class="t12 c3">${esc(c.place)}</span></span></a></li>`).join('')}</ul></div>
-        <div><div class="sec-hd"><h2 class="sec-t">Мероприятия клубов</h2><a class="link row-l" href="#/" ${soon('Мероприятия соберём отдельным блоком')}>Афиша ${ic('right', 14)}</a></div>
+        <div><div class="sec-hd"><h2 class="sec-t">Мероприятия клубов</h2><a class="link row-l" href="#/" ${soon('Мероприятия соберём отдельным блоком')}>Посмотреть все ${ic('right', 16)}</a></div>
           <ul class="comm-l">${events.map((c) => `<li><a href="#/" ${soon('Страницу мероприятия соберём отдельным блоком')}><img loading="lazy" src="${c.img}" alt=""><span><b>${esc(c.t)}</b><span class="t12 c3">${esc(c.place)}${c.when ? `, ${esc(c.when)}` : ''}</span></span></a></li>`).join('')}</ul></div>
       </div></section>
 
@@ -491,6 +551,8 @@
   }
 
   /* ---------- Каталог ---------- */
+  const catalogDisplayOrder = ['a-leman', 'a-guilliman', 'a-redemptor', 'strudd', 'darkshroud', 'prisoners', 'yucatan', 'trukk', 'zeratul', 'skorpekh', 'brutalis', 'worldeaters'];
+  const catalogRank = new Map(catalogDisplayOrder.map((id, index) => [id, index]));
   function catalogList(src) {
     const c = src || S.cat; const q = c.q.trim().toLowerCase();
     let list = [];
@@ -506,6 +568,10 @@
       return true;
     };
     list = list.filter(hit);
+    if (c.sort === 'new' || c.sort === 'old') {
+      const rank = (entry) => catalogRank.get(entry.o.id) ?? catalogRank.size;
+      list.sort((a, b) => rank(a) - rank(b));
+    }
     if (c.sort === 'cheap') list.sort((a, b) => a.o.price - b.o.price);
     if (c.sort === 'dear') list.sort((a, b) => b.o.price - a.o.price);
     if (c.sort === 'old') list.reverse();
@@ -522,8 +588,8 @@
     return o;
   }
   const fOn = (k) => { const c = S.cat; if (k === 'cat') return !!c.node; if (k === 'price') return !!(c.min || c.max); if (k === 'geo') return c.city !== 'Все' || c.country !== 'Все'; return !!(c.f[k] && c.f[k].length); };
-  /* Фильтры раскрыты: так ими чаще пользуются. Без фасетного индекса результат показываем по кнопке */
-  function pend(sel) { if (window.innerWidth < 1024) return; if (!ui.applied) ui.applied = JSON.parse(JSON.stringify(S.cat)); ui.fTip = sel; }
+  /* На десктопе подсказка применяет изменённые фильтры к выдаче */
+  function pend(sel) { if (!catalogDesktop.matches) return; if (!ui.applied) ui.applied = JSON.parse(JSON.stringify(S.cat)); ui.fTip = sel; }
   function placeTip() {
     const t = document.getElementById('fltTip'); if (!t) return;
     const a = ui.fTip && document.querySelector(ui.fTip); if (!a) { t.hidden = true; return; }
@@ -531,13 +597,21 @@
     const hide = r.top < side.top - 4 || r.bottom > side.bottom + 4;
     t.hidden = hide; t.style.top = `${Math.round(r.top + r.height / 2 - t.offsetHeight / 2)}px`; t.style.left = `${Math.round(side.right + 12)}px`;
   }
-  const fsec = (k, title, body) => `<section class="flt" data-filter-group="${k}"><h2 class="flt-t ${fOn(k) ? 'on' : ''}">${title}</h2><div class="flt-b">${body}</div></section>`;
+  const mobileFilterOpen = (k) => mobileFilterSections[k] ?? ['sort', 'cat', 'price', 'seller', 'safe'].includes(k);
+  function fsec(k, title, body, mobile) {
+    const color = fOn(k) ? 'on' : '';
+    const open = !mobile || mobileFilterOpen(k);
+    const head = mobile
+      ? `<button class="flt-t ${color}" data-act="fltT" data-k="${k}" aria-expanded="${open}">${ic(open ? 'down' : 'right', 16)}${title}</button>`
+      : `<h2 class="flt-t ${color}">${title}</h2>`;
+    return `<section class="flt" data-filter-group="${k}">${head}${open ? `<div class="flt-b">${body}</div>` : ''}</section>`;
+  }
   const chks = (g, opts) => `<div class="stack-4">${opts.map((t) => `<label class="chk"><input type="checkbox" data-act-chg="flt" data-g="${g}" value="${esc(t)}" ${(S.cat.f[g] || []).includes(t) ? 'checked' : ''}><span class="box">${ic('check', 14)}</span><span>${esc(t)}</span></label>`).join('')}</div>`;
   /* Путь до категории: верхний раздел, подраздел, третий уровень */
   function nodePath(n) {
     let out = null;
     if (!n) return null;
-    MENU.forEach((m) => {
+    catalogCategories.forEach((m) => {
       if (m.t === n && !out) out = { top: m };
       m.groups.forEach((g) => g.items.forEach((i) => {
         if (i.t === n && !out) out = { top: m, group: g, l2: i };
@@ -546,7 +620,6 @@
     });
     return out;
   }
-  const NOT_CATS = ['Клубы', 'Афиша мероприятий', 'Подарочные сертификаты'];
   function catTree() {
     const lim = 5;
     const n = S.cat.node; const p = nodePath(n);
@@ -559,8 +632,8 @@
     };
     const hasSub = (m) => (t) => { const f = findL2(m, t); return !!(f && f.sub); };
     if (!p) {
-      const cats = MENU.filter((m) => !NOT_CATS.includes(m.t)).map((m) => m.t);
-      return `${items(cats, 'ct-all', 'root', (t) => MENU.find((m) => m.t === t).groups.length)}<div class="ct-sep"></div>${NOT_CATS.map((t) => `<a class="ct" href="#/" data-act="soon" data-text="Это отдельный раздел, не категория товаров">${esc(t)}</a>`).join('')}`;
+      const names = catalogCategories.map(section => section.t);
+      return items(names, 'ct-all', 'root', t => catalogCategories.find(section => section.t === t).groups.length);
     }
     const m = p.top; const named = m.groups.filter((g) => g.t).length > 1;
     let html = link('Все категории', '', 'up');
@@ -593,8 +666,25 @@
     const f = FILTERS.find((x) => x.k === k);
     return chks(f.k, f.o);
   }
-  function filtersHtml() {
-    return ['cat', 'price', 'seller', 'safe', 'geo'].concat(FILTERS.map((f) => f.k)).map((k) => fsec(k, FTITLE[k], fBody(k))).join('');
+  function filtersHtml(mobile = false) {
+    return ['cat', 'price', 'seller', 'safe', 'geo'].concat(FILTERS.map((f) => f.k)).map((k) => fsec(k, FTITLE[k], fBody(k), mobile)).join('');
+  }
+  const showFilterResults = () => `Показать ${catalogList().length}`;
+  function filterSheet(group) {
+    const full = group === 'all';
+    const title = full ? 'Фильтры' : FTITLE[group];
+    const sort = window.innerWidth < 768 ? fsec('sort', 'Сортировка', dd('sort', S.cat.sort, SORTS, { aria: 'Сортировка' }), true) : '';
+    return `<div class="scrim" data-act="closeFilters"><div class="modal filter-modal" role="dialog" aria-modal="true" aria-labelledby="filterTitle" data-stop>
+      <div class="modal-hd"><h2 class="h3" id="filterTitle">${title}</h2><button class="icon-btn" data-act="closeFilters" aria-label="Закрыть">${ic('x')}</button></div>
+      <div class="modal-bd">${full ? sort + filtersHtml(true) : fBody(group)}</div>
+      <div class="modal-ft flt-ft"><button class="btn primary lg block" data-act="closeFilters" id="filterResults">${showFilterResults()}</button>
+        ${full ? `<div class="flt-ft2"><button class="btn ghost sm" data-act="resetCat">Сбросить</button><button class="btn secondary sm" data-act="saveSearch">${ic('save', 16)}Сохранить поиск</button></div>` : ''}
+      </div>
+    </div></div>`;
+  }
+  function openFilters(group) {
+    ui.modal = { filters: group }; overlay();
+    ovEl.querySelector('.filter-modal .modal-hd button').focus();
   }
   const clampRow = (k, html, cls = '') => `<div class="clamp-box"><div class="clamp ${cls} ${ui.clamp[k] ? 'open' : ''}" data-clamp="${k}">${html}</div><button class="clamp-btn" data-act="clampT" data-k="${k}" hidden>${ui.clamp[k] ? 'Скрыть' : 'Показать ещё'}</button></div>`;
   function clampFit() {
@@ -611,22 +701,23 @@
   }
   function pageCatalog() {
     const c = S.cat; const src = ui.applied || S.cat; const list = catalogList(src); const act = activeFilters(src);
-    const shown = list;
-    return `<div class="wrap page">
+    const count = `${list.length} ${plural(list.length, 'объявление', 'объявления', 'объявлений')}`;
+    return `<div class="wrap page purchase-catalog">
       ${crumbs([HOME_C, CAT_C].concat(nodeCrumbs(c.node)))}
-      <div class="between" style="margin-bottom:12px"><h1 class="h1">${c.q ? `Поиск: ${esc(c.q)}` : esc(c.node || 'Каталог')}</h1>${list.length ? `<span class="c3 cat-count">${list.length} ${plural(list.length, 'объявление', 'объявления', 'объявлений')}</span>` : ''}</div>
+      <div class="between" style="margin-bottom:12px"><h1 class="h1">${c.q ? `Поиск: ${esc(c.q)}` : esc(c.node || 'Каталог')}</h1><span class="c3 cat-count">${count}</span></div>
       ${clampRow('tags', TAGS.map((t) => `<button class="chip plain" data-act="tagq" data-v="${t}">${t}</button>`).join(''), 'one')}
       <div class="cat-layout">
-        ${ui.fTip && ui.applied ? `<div class="flt-tip" id="fltTip"><button class="btn primary sm" data-act="fltApply">Показать ${catalogList().length}</button></div>` : ''}
+        ${ui.fTip && ui.applied ? `<div class="flt-tip" id="fltTip"><button class="btn primary sm" data-act="fltApply">${showFilterResults()}</button></div>` : ''}
         <aside class="cat-side" aria-label="Фильтры">${filtersHtml()}<div class="flt-act"><button class="btn ghost sm" data-act="resetCat">Сбросить</button><button class="btn secondary sm" data-act="saveSearch">${ic('save', 16)}Сохранить поиск</button></div></aside>
         <div>
           <div class="cat-bar">
             <div class="tabs-seg cat-tabs" role="tablist">${[['all', 'Все'], ['goods', 'Товары'], ['auc', 'Аукционы']].map(([k, l]) => `<button role="tab" aria-selected="${c.tab === k}" class="${c.tab === k ? 'on' : ''}" data-act="tab" data-v="${k}">${l}</button>`).join('')}</div>
+            ${act.length ? '' : `<button class="btn hide-d cat-flt" data-act="filters" aria-haspopup="dialog">${ic('filter', 16)}Фильтры</button>`}
             <div class="view-tg hide-t-up" role="group" aria-label="Вид выдачи"><button class="${c.view === 'two' ? 'on' : ''}" data-act="view" data-v="two" aria-label="По две карточки в ряд" aria-pressed="${c.view === 'two'}">${ic('grid', 20)}</button><button class="${c.view === 'one' ? 'on' : ''}" data-act="view" data-v="one" aria-label="Список, по одной в ряд" aria-pressed="${c.view === 'one'}">${ic('list', 20)}</button></div>
             <div class="sp-auto row catalog-sort">${dd('sort', c.sort, SORTS, { aria: 'Сортировка' })}</div>
           </div>
-          ${act.length ? `<div class="act-f">${act.map((a, i) => `<span class="chip plain af"><button data-act="fEdit" data-i="${i}">${esc(a.l)}</button><button class="af-x" data-act="dropF" data-i="${i}" aria-label="Убрать фильтр">${ic('x', 14)}</button></span>`).join('')}<button class="linkbtn" data-act="resetCat">Сбросить все</button></div>` : ''}
-          ${shown.length ? `<div class="grid g3 ${c.view === 'one' ? 'as-list' : ''}">${shown.map((x) => (x.t === 'i' ? pcard(x.o) : acard(x.o))).join('')}</div>`
+          ${act.length ? `<div class="act-f"><button class="af-filter hide-d" data-act="filters" aria-haspopup="dialog" aria-label="Фильтры, применено ${act.length}">${ic('filter', 18)}<span class="badge-n">${act.length}</span></button>${act.map((a, i) => `<span class="chip plain af"><button data-act="fEdit" data-i="${i}">${esc(a.l)}</button><button class="af-x" data-act="dropF" data-i="${i}" aria-label="Убрать фильтр">${ic('x', 14)}</button></span>`).join('')}<button class="linkbtn" data-act="resetCat">Сбросить все</button></div>` : ''}
+          ${list.length ? `<div class="grid g3 ${c.view === 'one' ? 'as-list' : ''}">${list.map((x) => (x.t === 'i' ? pcard(x.o) : acard(x.o))).join('')}</div>`
             : `<div class="empty"><div class="ico">${ic('search', 28)}</div><p class="h3">По вашему запросу ничего не найдено</p><p class="c2" style="margin:4px 0 16px">Попробуйте другой запрос или снимите фильтры</p><button class="btn secondary" data-act="resetCat">Сбросить фильтры</button></div>`}
         </div>
       </div>
@@ -648,6 +739,9 @@
   }
   function sellerCard(it) {
     const s = SELLERS[it.seller];
+    const statsKey = 'seller-' + it.seller;
+    const expanded = !!ui.opened[statsKey];
+    const moreStats = [['Подписчики', s.followers], ['Выполнено заказов', s.done], ['Сделано покупок', s.purchases], ['Срок ожидания оплаты', s.payWait]];
     const reviewsTxt = s.reviews ? `${s.reviews} ${plural(s.reviews, 'отзыв', 'отзыва', 'отзывов')}` : 'Отзывов пока нет';
     const own = isOwn(it); const subd = (S.subs || []).includes(it.seller); const blkd = (S.blks || []).includes(it.seller);
     const page = 'data-act="soon" data-text="Страницу продавца соберём отдельным блоком"';
@@ -659,11 +753,13 @@
           <div class="rate-row"><span>г.\u00a0${esc(s.city)}</span>${rating(s)}${s.reviews ? `<a class="link" href="#/reviews/${it.seller}" target="_blank">${reviewsTxt}</a>` : `<span>${reviewsTxt}</span>`}</div>
         </div>
       </div>
-      <dl class="seller-stats">
+      <dl class="seller-stats" id="seller-stats">
         <div><dt>На площадке</dt><dd>${esc(s.stazh)}</dd></div>
         <div><dt>Срок отправки</dt><dd>до ${esc(s.shipWait)}</dd></div>
         <div><dt>Вероятность задержки</dt><dd>${s.late}%</dd></div>
+        ${expanded ? moreStats.filter(([, value]) => value != null).map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(String(value))}</dd></div>`).join('') : ''}
       </dl>
+      <button type="button" class="linkbtn seller-more" aria-controls="seller-stats" data-act="${expanded ? 'close' : 'open'}" data-k="${statsKey}" aria-expanded="${expanded}">${expanded ? 'Свернуть' : 'Показать всё'} ${ic(expanded ? 'up' : 'down', 16)}</button>
       <div class="seller-act">
         ${own ? '' : isAuth() ? `<button class="seller-l ${subd ? 'on' : ''}" data-act="sub" data-id="${it.seller}" aria-pressed="${subd}">${ic('bell', 24)}<span>${subd ? 'Вы подписаны' : 'Подписаться'}</span></button>` : `<button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы подписаться: новые объявления продавца будут приходить в уведомления">${ic('bell', 24)}<span>Подписаться</span></button>`}
         <a class="seller-l" href="#/" ${page}>${ic('grid', 24)}<span>Все товары</span></a>
@@ -676,7 +772,7 @@
   function buyBlock(it) {
     const s = SELLERS[it.seller]; const out = S.flags.soldOut; const c = inCart(it.id); const fav = S.favs.includes(it.id);
     const dl = s.deliveries.map((d) => DELIVERY[d].title).join(', ');
-    const pay = s.pay.filter((p) => p !== 'cash' || s.deliveries.includes('pickup')).map((p) => (p === 'cash' ? 'наличными при\u00a0самовывозе' : PAYWAY[p].title.replace('\u00a0', ' '))).join(', ');
+    const pay = s.pay.filter((p) => p !== 'cash' || s.deliveries.includes('pickup')).map((p) => PAYWAY[p].title).join(', ');
     return `<div class="buy-top">
         <a class="c3 t12" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">${esc(it.cat)}</a>
         <h1 class="pdp-title">${esc(it.title)}</h1>
@@ -685,7 +781,7 @@
       <div class="buy-price">
         <div class="price-big">${fmt(it.price)}</div>
         ${out ? `<span class="stock no">${ic('x', 16)}Нет в наличии</span>` : `<span class="stock">${ic('check', 16)}${stockTxt(it)}</span>`}
-        ${badgeList(it).length ? `<div class="buy-badges">${badgeList(it).map(bdgTag).join('')}</div>` : ''}
+        ${!out && badgeList(it).length ? `<div class="buy-badges">${badgeList(it).map(bdgTag).join('')}</div>` : ''}
       </div>
       <div class="hide-m-cta">
         ${isOwn(it) ? `<div class="buy-cta">${ownEdit('secondary lg')}</div>`
@@ -771,7 +867,8 @@
     const it = byId(r.id) || ITEMS[0];
     const s = SELLERS[it.seller]; const revs = REVIEWS[it.seller] || [];
     const tabs = [['desc', 'Описание']].concat(it.specs.length ? [['specs', 'Характеристики']] : [], [['talk', 'Обсуждение', 0], ['reviews', 'Отзывы о товаре', revs.length]]);
-    const similar = ITEMS.filter((i) => i.id !== it.id && i.top === it.top).slice(0, 4);
+    const sameCategory = ITEMS.filter((i) => i.id !== it.id && i.top === it.top).map((i) => i.id);
+    const similar = [...new Set([...sameCategory, 'arkham', 'zombicide'])].filter((id) => id !== it.id).slice(0, 4).map(byId);
     const tabBody = itemTab(it, revs);
     return pageItemTail(it, s, tabs, similar, tabBody);
   }
@@ -797,7 +894,10 @@
     return tabBody;
   }
   function pageItemTail(it, s, tabs, similar, tabBody) {
-    return `<div class="wrap page">
+    const excluded = new Set([it.id, ...similar.map((item) => item.id)]);
+    const picks = ['terminators', 'darkshroud', 'yucatan', 'zeratul', 'warriors', 'brutalis', 'lutazy', 'trukk'];
+    const recommendations = picks.filter((id) => !excluded.has(id)).slice(0, 4).map(byId);
+    return `<div class="wrap page purchase-item">
       ${crumbs([HOME_C, CAT_C].concat(it.crumbs.map((c) => ({ t: c, a: `data-act="nodeq" data-v="${esc(c)}"` }))))}
       <div class="pdp">
         <div class="pdp-main">${gallery(it)}</div>
@@ -810,8 +910,8 @@
           <div class="tab-body" id="tabs">${tabBody}</div>
         </div>
       </div>
-      ${similar.length ? `<section class="sec"><div class="sec-hd"><h2 class="h2">Похожие товары</h2><a class="link row-l" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">Все в категории ${ic('right', 14)}</a></div><div class="scroller">${similar.map((x) => pcard(x)).join('')}</div></section>` : ''}
-      ${recsBlock([it.id].concat(similar.map((x) => x.id)), 'Специально для вас')}
+      ${similar.length ? `<section class="sec"><div class="sec-hd"><h2 class="sec-t">Похожие товары</h2><a class="link row-l" href="#/catalog" data-act="nodeq" data-v="${esc(it.cat)}">Посмотреть все ${ic('right', 14)}</a></div><div class="grid">${similar.map((x) => pcard(x)).join('')}</div></section>` : ''}
+      <section class="sec"><div class="sec-hd"><h2 class="sec-t">Специально для вас</h2><a class="link row-l" href="#/catalog">Посмотреть все ${ic('right', 14)}</a></div><div class="grid">${recommendations.map((item) => pcard(item)).join('')}</div></section>
     </div>`;
   }
 
@@ -828,7 +928,7 @@
         <p class="t12 c3">${esc(it.cat)}</p>
         ${it.lot ? `<p class="ci-lot">${ic('gavel', 14)}<span>Выигранный лот, оформите за <b data-end="${S.won[it.id].end}"></b></span></p>` : ''}
         ${out ? `<div class="err-t">${ic('alert', 14)}<span>${rest < 1 ? 'Товар закончился' : `В наличии только ${rest} шт.`}</span></div>` : ''}
-        ${out && rest > 0 ? `<button class="linkbtn t12" style="margin-top:4px" data-act="fixQty" data-id="${it.id}" data-v="${rest}">Оставить ${rest} шт.</button>` : ''}
+        ${out && rest > 0 ? `<button class="linkbtn t12 co-underline" style="margin-top:4px" data-act="fixQty" data-id="${it.id}" data-v="${rest}">Оставить ${rest} шт.</button>` : ''}
       </div>
       <div class="ci-ctl">
         <span class="ci-price">${fmt(it.price * l.qty)}</span>
@@ -845,7 +945,7 @@
     if (!rel.length) return '';
     const off = ui.relOff[g.sid];
     return `<div class="rel"><button class="rel-t" data-act="relT" data-k="${g.sid}" aria-expanded="${!off}"><span>Другие товары продавца</span>${ic(off ? 'down' : 'up', 16)}</button>
-      ${off ? '' : `<p class="t12 c2 rel-h">Они войдут в этот же заказ у продавца</p><div class="rel-list">${rel.slice(0, 6).map((i) => `<a class="rl" href="#/item/${i.id}"><img loading="lazy" src="${i.img}" alt=""><span class="rl-p">${fmt(i.price)}</span><span class="rl-t">${esc(i.title)}</span></a>`).join('')}</div>`}</div>`;
+      ${off ? '' : `<div class="rel-list">${rel.slice(0, 6).map((i) => `<a class="rl" href="#/item/${i.id}"><img loading="lazy" src="${i.img}" alt=""><span class="rl-p">${fmt(i.price)}</span><span class="rl-t">${esc(i.title)}</span></a>`).join('')}</div>`}</div>`;
   }
   const REC_IDS = ['terminators', 'darkshroud', 'yucatan', 'arkham', 'zombicide', 'warriors'];
   function viewedBlock(exclude) {
@@ -860,40 +960,50 @@
     return `<section class="sec"><div class="sec-hd"><h2 class="h2">${title || 'Может понравиться'}</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
   }
   function cartCta(blocked, anyOut, minBad) {
-    if (!blocked) return '<a class="btn primary lg block hide-sm" href="#/checkout">Перейти к оформлению</a>';
+    if (!blocked) return '<a class="btn primary lg block cart-summary-cta" href="#/checkout">Перейти к оформлению</a>';
     const why = anyOut ? 'Уберите товары, которых нет в наличии' : minBad ? 'Сумма заказа меньше минимальной у продавца' : 'Выберите хотя бы один товар';
     return `<div><button class="btn lg block is-disabled" disabled>Перейти к оформлению</button><p class="err-t">${ic('info', 14)}<span>${why}</span></p></div>`;
   }
   function pageCart() {
     const all = groups(false); const on = groups(true);
     if (!S.cart.length) {
-      return `<div class="wrap page"><h1 class="h1" style="margin-bottom:16px">Корзина</h1>
+      return `<div class="wrap page cart-page"><h1 class="h1" style="margin-bottom:16px">Корзина</h1>
         <div class="empty"><div class="ico">${ic('cart', 28)}</div><p class="h3">В корзине пока пусто</p><p class="c2" style="margin:4px 0 16px">Найдите нужное в каталоге или через поиск</p><a class="btn primary" href="#/catalog">Перейти в каталог</a></div>
         ${viewedBlock([])}</div>`;
     }
-    const fees = on.reduce((a, g) => a + coFee(g), 0);
-    const safeQty = on.filter(coFee).reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
-    const total = on.reduce((a, g) => a + g.sum, 0) + fees;
+    const prices = checkoutPrices(on);
+    const fees = prices.reduce((sum, order) => sum + order.fee, 0);
+    const safeQty = on.filter(protectedOrder).reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
+    const total = prices.reduce((sum, order) => sum + order.total, 0);
+    const discount = prices.reduce((sum, o) => sum + o.g.sum + (dlPrice(o.g) || 0) + o.fee - o.total, 0);
+    const hasDelivery = on.some(g => dlPrice(g) !== null);
+    const delivery = on.reduce((sum, g) => sum + (dlPrice(g) || 0), 0);
+    const pendingDelivery = on.some(g => dlPrice(g) === null);
+    const deliveryText = !hasDelivery ? 'на следующем шаге' : (delivery ? fmt(delivery) : 'бесплатно') +
+      (pendingDelivery ? ' · частично выбрана' : '');
+    const totalLabel = hasDelivery || discount ? 'Итого' : 'Итого за товары';
     const count = on.reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
     const anyOut = S.cart.some(isOut); const minBad = on.some(minProblem);
     const blocked = !count || anyOut || minBad;
     const allOn = S.cart.every((c) => c.on);
-    return `<div class="wrap page">
+    return `<div class="wrap page cart-page">
       <div class="between" style="margin-bottom:12px"><h1 class="h1">Корзина</h1><span class="c3">${cartCount()} ${plural(cartCount(), 'товар', 'товара', 'товаров')}</span></div>
       ${S.notice ? `<div class="note bad" style="margin-bottom:12px" role="alert">${ic('alert')}<div class="body">${esc(S.notice)}</div></div>` : ''}
       <div class="two">
         <div>
           <div class="cart-tools">
             <label class="chk"><input type="checkbox" data-act-chg="all" ${allOn ? 'checked' : ''}><span class="box">${ic('check', 14)}</span><span>Выбрать все</span></label>
-            <button class="linkbtn" data-act="rmOff" style="color:var(--text-2)">${ic('trash', 16)}Удалить выбранное</button>
+            <button class="linkbtn co-underline" data-act="rmOff" style="color:var(--text-2)">${ic('trash', 16)}Удалить выбранное</button>
           </div>
           ${all.map((g) => {
-            const gOn = on.find((x) => x.sid === g.sid);
+            const order = prices.find(o => o.g.sid === g.sid);
+            const gOn = order?.g;
             const need = gOn ? minProblem(gOn) : 0;
             const free = g.seller.freeFrom;
             return `<section class="sg">
               <header class="sg-hd"><span class="sb">${esc(g.seller.name)}</span>${g.seller.pro ? '<span class="tag pro">PRO</span>' : ''}<span class="row t12 c2" style="gap:4px">${g.seller.reviews ? `${STAR}${g.seller.rating.toFixed(2)}` : 'Новый продавец'}</span><span class="t12 c3">${esc(g.seller.city)}</span></header>
               ${g.lines.map(cartLine).join('')}
+              ${order ? safeSwitch(gOn, order.availableFee) : ''}
               ${need || free ? `<div class="sg-ft">
                 ${need ? `<div class="note warn" role="status">${ic('alert')}<div class="body">Минимальная сумма заказа у продавца ${fmt(g.seller.minSum)}. Доберите товаров на ${fmt(need)}</div></div>` : ''}
                 ${free && !need ? `<div class="note ok">${ic('truck')}<div class="body">${gOn && gOn.sum >= free ? 'Бесплатная доставка!' : `Добавьте товаров на ${fmt(free - (gOn ? gOn.sum : 0))}, чтобы получить бесплатную доставку`}</div></div>` : ''}
@@ -906,15 +1016,16 @@
           <div class="h3">Ваш заказ</div>
           ${on.length > 1 ? `<div class="note info">${ic('info')}<div class="body"><b>Будет ${on.length} ${plural(on.length, 'заказ', 'заказа', 'заказов')}.</b> У каждого продавца своё подтверждение, оплата и доставка</div></div>` : ''}
           ${on.map((g) => `<div class="sum-row"><span class="c2">${esc(g.seller.name)}</span><span class="v">${fmt(g.sum)}</span></div>`).join('')}
-          ${fees ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${safeQty}</span><span class="v">${fmt(fees)}</span></div>` : ''}<div class="sum-row"><span class="c2">Доставка</span><span class="v c2">на следующем шаге</span></div>
-          <div class="sum-total"><span>Итого за товары</span><span class="v">${fmt(total)}</span></div>
+          ${safeQty ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${safeQty}</span><span class="v">${fmt(fees)}</span></div>` : ''}<div class="sum-row"><span class="c2">Доставка</span><span class="v c2">${deliveryText}</span></div>
+          ${discount ? `<div class="sum-row"><span class="c2">Скидки и сертификаты</span><span class="v">−${fmt(discount)}</span></div>` : ''}
+          <div class="sum-total"><span>${totalLabel}</span><span class="v">${fmt(total)}</span></div>
           ${cartCta(blocked, anyOut, minBad)}
         </aside>
       </div>
       ${viewedBlock(S.cart.map((c) => c.id))}
       ${recsBlock(S.cart.map((c) => c.id))}
     </div>
-    <div class="sticky-bar"><div class="sum"><span class="t12 c3">Итого за товары</span><b>${fmt(total)}</b></div>${blocked ? '<button class="btn lg is-disabled" disabled>К оформлению</button>' : '<a class="btn primary lg" href="#/checkout">К оформлению</a>'}</div>`;
+    <div class="sticky-bar"><div class="sum"><span class="t12 c3">${totalLabel}</span>${safeQty ? `<span class="cart-sticky-fee">Безопасная сделка ×${safeQty} ${fmt(fees)}</span>` : ''}<b>${fmt(total)}</b></div>${blocked ? '<button class="btn lg is-disabled" disabled>К оформлению</button>' : '<a class="btn primary lg" href="#/checkout">К оформлению</a>'}</div>`;
   }
 
   /* ---------- Оформление ---------- */
@@ -929,15 +1040,26 @@
   };
   const coGroups = () => groups(true);
   const needsAddress = () => coGroups().some((g) => { const d = S.co.dl[g.sid]; return d && DELIVERY[d].needs === 'address'; });
-  const needsIndex = () => coGroups().some((g) => S.co.dl[g.sid] === 'post');
+  const addressOrders = () => coGroups().filter(g => DELIVERY[S.co.dl[g.sid]]?.needs === 'address');
+  const needsIndex = () => addressOrders().some((g, i) => S.co.dl[g.sid] === 'post' && (i === 0 || !S.co.addr?.[g.sid]));
+  function postalError(value) {
+    return /^\d{6}$/.test(value) ? '' : value ? 'В индексе 6 цифр' : 'Укажите индекс';
+  }
+  function ownAddressError(sid, key) {
+    const value = (S.co.addr[sid][key] || '').trim();
+    if (key === 'index' && S.co.dl[sid] === 'post') return postalError(value);
+    if (key === 'street' && !value) return 'Укажите улицу';
+    if (key === 'house' && !value) return 'Укажите дом';
+    return '';
+  }
   function fieldError(n) {
-    const v = (S.form[n] || '').trim();
+    const v = (recipientValue(n) || '').trim();
     if (n === 'email') { if (!v) return 'Укажите email'; if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v)) return 'Проверьте email: например, name@example.com'; }
     if (n === 'phone') { const d = v.replace(/\D/g, ''); if (!d || d === '7') return 'Укажите телефон'; if (d.length < 11) return 'Проверьте номер: нужно 10 цифр после +7'; }
     if (n === 'fio') { if (!v) return 'Укажите фамилию и имя'; if (v.split(/\s+/).length < 2) return 'Нужны хотя бы фамилия и имя'; }
     if (n === 'street' && needsAddress() && !v) return 'Укажите улицу';
     if (n === 'house' && needsAddress() && !v) return 'Укажите дом';
-    if (n === 'index' && needsIndex() && !/^\d{6}$/.test(v)) return v ? 'В индексе 6 цифр' : 'Индекс нужен для Почты России';
+    if (n === 'index' && needsIndex()) return postalError(v);
     return '';
   }
   const showErr = (n) => (ui.submitted || ui.touched[n]) && fieldError(n);
@@ -945,20 +1067,57 @@
     const f = FIELD[n]; const err = showErr(n);
     return `<label class="fld ${err ? 'err' : ''} ${cls || ''}" data-fld="${n}">
       <span class="lbl">${f.label}${f.opt ? ' <em>необязательно</em>' : ''}</span>
-      <input class="inp" name="${n}" type="${f.type || 'text'}" ${f.ac ? `autocomplete="${f.ac}"` : ''} ${f.im ? `inputmode="${f.im}"` : ''} ${f.ph ? `placeholder="${f.ph}"` : ''} value="${esc(S.form[n] || '')}" ${err ? 'aria-invalid="true"' : ''}>
+      <input class="inp" name="${n}" type="${f.type || 'text'}" ${f.ac ? `autocomplete="${f.ac}"` : ''} ${f.im ? `inputmode="${f.im}"` : ''} ${f.ph ? `placeholder="${f.ph}"` : ''} value="${esc(recipientValue(n) || '')}" ${err ? 'aria-invalid="true"' : ''}>
       ${err ? `<span class="err-t">${err}</span>` : f.hint ? `<span class="hint">${f.hint}</span>` : ''}
     </label>`;
   }
   const dlPrice = (g) => {
     const d = S.co.dl[g.sid]; if (!d) return null;
-    if (g.seller.freeFrom && g.sum >= g.seller.freeFrom) return 0;
+    if (DELIVERY[d].price === 0 || (g.seller.freeFrom && g.sum >= g.seller.freeFrom)) return 0;
     return DELIVERY[d].price + (S.co.surcharge && S.co.surcharge[g.sid] ? S.co.surcharge[g.sid] : 0);
   };
-  const promoOff = (g) => (S.co.promo[g.sid] === 'MINI10' ? Math.round(g.sum * 0.1) : 0);
-  const coFee = (g) => (S.co.pay[g.sid] === 'safe' ? safeFee(g.sum) : 0);
-  const orderTotal = (g) => g.sum - promoOff(g) + (dlPrice(g) || 0) + coFee(g);
-  const certOff = (sum) => (S.co.cert === 'GIFT500' ? Math.min(500, sum) : 0);
-  const grand = () => { const v = coGroups().reduce((a, g) => a + orderTotal(g), 0); return v - certOff(v); };
+  const CERT_VALUES = { GIFT500: 500, GIFT1000: 1000 };
+  const PROMO_CODES = ['MINI10', 'SHIP200'];
+  function checkoutPrices(groups = coGroups()) {
+    const remaining = new Map(S.co.certificates.map(code => [code, CERT_VALUES[code] || 0]));
+    return groups.map(g => {
+      const delivery = dlPrice(g) || 0;
+      const promos = {};
+      let goodsDue = g.sum, deliveryDue = delivery;
+      for (const code of S.co.promo[g.sid] || []) {
+        if (code === 'MINI10') {
+          promos[code] = g.sum - Math.floor(g.sum * 90 / 100);
+          goodsDue -= promos[code];
+        }
+        if (code === 'SHIP200') {
+          promos[code] = Math.min(200, deliveryDue);
+          deliveryDue -= promos[code];
+        }
+      }
+      const certificates = {};
+      for (const [code, balance] of remaining) {
+        const onGoods = Math.min(balance, goodsDue);
+        const onDelivery = Math.min(balance - onGoods, deliveryDue);
+        goodsDue -= onGoods;
+        deliveryDue -= onDelivery;
+        certificates[code] = onGoods + onDelivery;
+        remaining.set(code, balance - certificates[code]);
+      }
+      const availableFee = safeFee(goodsDue);
+      const fee = protectedOrder(g) ? availableFee : 0;
+      return { g, promos, certificates, availableFee, fee, total: goodsDue + deliveryDue + fee };
+    });
+  }
+  function protectedOrder(g) {
+    return S.co.pay[g.sid] !== 'cash' && sellerSafe(g.seller) && !!S.co.safe[g.sid];
+  }
+  function safeSwitch(g, cartFee) {
+    if (!sellerSafe(g.seller) || S.co.pay[g.sid] === 'cash') return '';
+    const inCart = cartFee !== undefined;
+    const hintId = `safe-hint-${g.sid}`;
+    return `<label class="safe-option${inCart ? ' cart-safe' : ''}">${inCart ? ic('shield', 20) : ''}<span><strong>Безопасная сделка</strong><small id="${hintId}">${PAYWAY.safe.note}${inCart ? ': ' + fmt(cartFee) : ''}</small></span><input type="checkbox" role="switch" aria-label="Безопасная сделка" aria-describedby="${hintId}" data-act-chg="safe" data-s="${g.sid}" ${protectedOrder(g) ? 'checked' : ''}></label>`;
+  }
+  const grand = () => checkoutPrices().reduce((sum, order) => sum + order.total, 0);
 
   /* Адрес один на все заказы: значения хранятся в форме, поэтому при смене способа не сбрасываются */
   function addressFields() {
@@ -967,16 +1126,18 @@
   function addressSlot(g) {
     const dl = S.co.dl[g.sid];
     if (!dl || DELIVERY[dl].needs !== 'address') return '';
-    const first = coGroups().find((x) => { const d = S.co.dl[x.sid]; return d && DELIVERY[d].needs === 'address'; });
+    const [first] = addressOrders();
     if (first.sid === g.sid) return addressFields();
     const own = S.co.addr && S.co.addr[g.sid];
     if (own) {
-      const inp = (k, label, cls) => `<label class="fld ${cls}"><span class="lbl">${label}</span><input class="inp" data-addr="${g.sid}" data-k="${k}" value="${esc(own[k] || '')}"></label>`;
-      const bad = ui.submitted && (!own.street || !own.house);
-      return `<div class="addr"><div class="lbl-row"><p class="lbl-b" style="margin:0">Адрес этого заказа, ${esc(S.co.city)}</p><button type="button" class="x-btn" data-act="addrOff" data-s="${g.sid}" aria-label="Использовать адрес выше">${ic('x', 16)}</button></div><div class="addr-grid">${inp('street', 'Улица', 'a-street')}${inp('house', 'Дом', 'a-sm')}${inp('flat', 'Квартира', 'a-sm')}${dl === 'post' ? inp('index', 'Индекс', 'a-idx') : ''}</div>${bad ? `<p class="err-t">${ic('alert', 14)}<span>Укажите улицу и дом</span></p>` : ''}</div>`;
+      const inp = (k, label, cls) => {
+        const err = ui.submitted && ownAddressError(g.sid, k);
+        return `<label class="fld ${cls} ${err ? 'err' : ''}" data-own-field="${g.sid}-${k}"><span class="lbl">${label}</span><input class="inp" data-addr="${g.sid}" data-k="${k}" ${k === 'index' ? 'inputmode="numeric"' : ''} aria-invalid="${!!err}" aria-describedby="err-${g.sid}-${k}" value="${esc(own[k] || '')}"><span class="err-t" id="err-${g.sid}-${k}" ${err ? '' : 'hidden'}>${err || ''}</span></label>`;
+      };
+      return `<div class="addr"><div class="lbl-row"><p class="lbl-b" style="margin:0">Адрес этого заказа, ${esc(S.co.city)}</p><button type="button" class="x-btn" data-act="addrOff" data-s="${g.sid}" aria-label="Использовать адрес выше">${ic('x', 16)}</button></div><div class="addr-grid">${inp('street', 'Улица', 'a-street')}${inp('house', 'Дом', 'a-sm')}${inp('flat', 'Квартира', 'a-sm')}${dl === 'post' ? inp('index', 'Индекс', 'a-idx') : ''}</div></div>`;
     }
     const f = S.form; const line = [f.street, f.house && `д. ${f.house}`, f.flat && `кв. ${f.flat}`].filter(Boolean).join(', ');
-    return `<div class="addr-same"><p class="c2">Адрес как в заказе выше${line ? `: ${esc(line)}` : ''}</p><button type="button" class="linkbtn" data-act="addrOn" data-s="${g.sid}">${ic('plus', 16)}Добавить другой адрес</button></div>`;
+    return `<div class="addr-same"><p class="c2">Адрес как в заказе выше${line ? `: ${esc(line)}` : ''}</p>${checkoutLink('Добавить другой адрес', 'addrOn', `data-s="${g.sid}"`)}</div>`;
   }
   function sellerBlock(g, i, n) {
     const s = g.seller; const co = S.co; const city = co.city;
@@ -989,14 +1150,14 @@
     return `<div class="seller-order ${dlErr || pvzErr ? 'err' : ''}" id="so-${g.sid}">
       <div class="so-hd"><span class="sb">${n > 1 ? `Заказ ${i + 1} из ${n}: ` : ''}${esc(s.name)}</span>${s.pro ? '<span class="tag pro">PRO</span>' : ''}<span class="t12 c3">${esc(s.city)}</span></div>
       <div class="so-bd">
-        ${g.lines.length === 1 ? `<div class="so-item-one"><img src="${g.lines[0].item.img}" alt="" width="56" height="56"><div style="min-width:0"><p class="t">${esc(g.lines[0].item.title)}</p><p class="t12 c3">${g.lines[0].qty} шт. · ${fmt(g.sum)}</p></div></div>`
-          : `<div><div class="so-items">${g.lines.map((l) => `<img src="${l.item.img}" alt="${esc(l.item.title)}">`).join('')}</div><p class="t12 c3" style="margin-top:4px">${g.lines.reduce((a, l) => a + l.qty, 0)} шт. · ${fmt(g.sum)}</p></div>`}
+        ${g.lines.map(l => `<div class="so-item-one"><img src="${l.item.img}" alt="" width="56" height="56"><div><p class="t">${esc(l.item.title)}</p><p class="t12 c3">${l.qty} шт. ${g.lines.length > 1 ? `× ${fmt(l.item.price)} ` : ''}· ${fmt(l.qty * l.item.price)}</p></div></div>`).join('')}
+        ${g.lines.length > 1 ? `<p class="sb">${g.lines.reduce((n, l) => n + l.qty, 0)} шт. · ${fmt(g.sum)}</p>` : ''}
         ${!city ? '<p class="c3">Укажите город выше, и мы покажем доступные способы получения</p>' : `
         <div>
           <p class="lbl-b">Как получить</p>
           <div class="opt-list two-col" role="radiogroup" aria-label="Способ получения">
             ${opts.map((d) => { const D = DELIVERY[d]; const on = dl === d; const free = D.price === 0 || (s.freeFrom && g.sum >= s.freeFrom);
-              return `<label class="opt ${on ? 'on' : ''}"><input type="radio" name="dl-${g.sid}" data-act-chg="dl" data-s="${g.sid}" value="${d}" ${on ? 'checked' : ''}><span class="dot"></span><span class="main"><span class="sb" style="display:block">${D.title}</span><span class="pr">${free ? 'бесплатно' : fmt(D.price)}</span><span class="t12 c3" style="display:block">${d === 'pickup' ? `${esc(s.city)}. ${D.note}` : D.note}</span>
+              return `<label class="opt ${on ? 'on' : ''}"><input type="radio" name="dl-${g.sid}" data-act-chg="dl" data-s="${g.sid}" value="${d}" ${on ? 'checked' : ''}><span class="dot"></span><span class="main"><span class="sb" style="display:block">${D.title}</span><span class="pr">${free ? 'бесплатно' : fmt(on ? dlPrice(g) : D.price)}</span><span class="t12 c3" style="display:block">${d === 'pickup' ? `${esc(s.city)}. ${D.note}` : D.note}</span>
                 ${on && D.needs === 'pvz' ? `<span class="opt-sub" style="display:block">${pvz ? `<span class="t12" style="display:block">${pvz.name}</span>` : ''}<button type="button" class="linkbtn t12" data-act="pvz" data-s="${g.sid}">${pvz ? 'Изменить пункт' : 'Выбрать пункт выдачи'}</button></span>` : ''}</span></label>`; }).join('')}
           </div>
           ${pickupHidden ? `<p class="t12 c3" style="margin-top:8px">Самовывоз доступен только в городе продавца: ${esc(s.city)}</p>` : ''}
@@ -1008,62 +1169,132 @@
       </div>
     </div>`;
   }
-  function payBlock(g, i, n) {
+  function payBlock(g, i, n, total) {
     const s = g.seller; const co = S.co; const dl = co.dl[g.sid];
     const canPay = (p) => p !== 'cash' || dl === 'pickup';
-    const payOpts = s.pay.concat(sellerSafe(s) ? ['safe'] : []).filter(canPay);
+    const payOpts = s.pay.filter(canPay);
     const pay = payOpts.includes(co.pay[g.sid]) ? co.pay[g.sid] : payOpts[0];
     co.pay[g.sid] = pay;
-    const openC = ui.opened['c' + g.sid]; const openP = ui.opened['p' + g.sid];
-    const x = (k) => `<button type="button" class="x-btn" data-act="close" data-k="${k}${g.sid}" data-s="${g.sid}" aria-label="Убрать">${ic('x', 16)}</button>`;
+    const openC = ui.opened['c' + g.sid];
     return `<div class="pay-b">
-      <div class="pay-hd"><div class="so-items">${g.lines.slice(0, 3).map((l) => `<img src="${l.item.img}" alt="${esc(l.item.title)}">`).join('')}</div><div style="min-width:0"><p class="sb">${n > 1 ? `Заказ ${i + 1} из ${n}: ` : ''}${esc(s.name)}</p><p class="c2">${g.lines.reduce((a, l) => a + l.qty, 0)} шт. на ${fmt(orderTotal(g))}</p></div></div>
-      <div class="opt-list two-col" role="radiogroup" aria-label="Способ оплаты">
+      <div class="pay-hd"><div class="so-items">${g.lines.slice(0, 3).map((l) => `<img src="${l.item.img}" alt="${esc(l.item.title)}">`).join('')}</div><div style="min-width:0"><p class="sb">${n > 1 ? `Заказ ${i + 1} из ${n}: ` : ''}${esc(s.name)}</p><p class="c2">${g.lines.reduce((a, l) => a + l.qty, 0)} шт. на ${fmt(total)}</p></div></div>
+      <div class="opt-list two-col" role="group" aria-label="Способ оплаты">
         ${payOpts.map((p) => { const P = PAYWAY[p]; const on = pay === p; return `<label class="opt ${on ? 'on' : ''}"><input type="radio" name="pay-${g.sid}" data-act-chg="pay" data-s="${g.sid}" value="${p}" ${on ? 'checked' : ''}><span class="dot"></span><span class="main"><span class="sb" style="display:block">${P.title}</span><span class="t12 c3" style="display:block">${P.note}</span></span></label>`; }).join('')}
+        ${safeSwitch(g)}
       </div>
-      ${openC ? `<div class="fld"><div class="lbl-row"><label class="lbl" for="cm-${g.sid}">Комментарий продавцу</label>${x('c')}</div><textarea class="inp" id="cm-${g.sid}" rows="3" data-co-comment="${g.sid}" placeholder="Например, удобное время для связи">${esc(co.comment[g.sid] || '')}</textarea></div>` : ''}
-      ${co.promo[g.sid] ? `<div class="note ok">${ic('tag')}<div class="body between"><span>Промокод ${esc(co.promo[g.sid])}: скидка ${fmt(promoOff(g))}</span><button type="button" class="x-btn" data-act="promoOff" data-s="${g.sid}" aria-label="Убрать промокод">${ic('x', 16)}</button></div></div>`
-        : openP ? `<div class="fld ${ui.promoErr[g.sid] ? 'err' : ''}"><div class="lbl-row"><label class="lbl" for="promo-${g.sid}">Промокод</label>${x('p')}</div><div class="promo-row"><input class="inp" id="promo-${g.sid}" autocomplete="off"><button type="button" class="btn secondary" data-act="promo" data-s="${g.sid}">Применить</button></div>${ui.promoErr[g.sid] ? `<span class="err-t">${ui.promoErr[g.sid]}</span>` : ''}</div>` : ''}
-      ${openC && (openP || co.promo[g.sid]) ? '' : `<div class="row pay-more">
-        ${openC ? '' : `<button type="button" class="linkbtn" data-act="open" data-k="c${g.sid}">${ic('plus', 16)}Комментарий продавцу</button>`}
-        ${openP || co.promo[g.sid] ? '' : `<button type="button" class="linkbtn" data-act="open" data-k="p${g.sid}">${ic('plus', 16)}Промокод</button>`}
-      </div>`}
+      ${openC ? `<div class="fld">${closeHeading('Комментарий продавцу', `cm-${g.sid}`, 'close', `data-k="c${g.sid}" data-s="${g.sid}"`)}<textarea class="inp" id="cm-${g.sid}" rows="3" data-co-comment="${g.sid}" placeholder="Например, удобное время для связи">${esc(co.comment[g.sid] || '')}</textarea></div>` : ''}
+      ${openC ? '' : `<div class="row pay-more">${checkoutLink('Комментарий продавцу', 'open', `data-k="c${g.sid}"`)}</div>`}
     </div>`;
   }
-  function certBlock() {
-    const raw = coGroups().reduce((a, g) => a + orderTotal(g), 0);
-    if (S.co.cert) return `<div class="sum-row"><span class="c2">Сертификат ${esc(S.co.cert)}</span><span class="v row">−${fmt(certOff(raw))}<button type="button" class="x-btn" data-act="certOff" aria-label="Убрать сертификат">${ic('x', 16)}</button></span></div>`;
-    if (!ui.certOpen) return `<button type="button" class="linkbtn" data-act="certT">${ic('plus', 16)}Подарочный сертификат</button>`;
-    return `<div class="fld ${ui.certErr ? 'err' : ''}"><div class="lbl-row"><label class="lbl" for="cert">Подарочный сертификат</label><button type="button" class="x-btn" data-act="certT" aria-label="Убрать">${ic('x', 16)}</button></div><div class="promo-row"><input class="inp" id="cert" autocomplete="off" placeholder="Код"><button type="button" class="btn secondary" data-act="certGo">Применить</button></div>${ui.certErr ? `<span class="err-t">${ui.certErr}</span>` : ''}</div>`;
+  function resetCodeEntry() {
+    ui.codeDraft = ''; ui.codeError = ''; ui.chooseSeller = false; ui.codeStatus = '';
+  }
+  function discountRow(code, amount, seller = '', showSeller = false) {
+    const kind = seller ? 'Промокод' : 'Сертификат';
+    const title = `${kind} ${code}${showSeller ? ' · ' + SELLERS[seller].name : ''}`;
+    return `<li class="discount-row"><span>${esc(title)}</span><strong>${amount ? '−' : ''}${fmt(amount)}</strong><button type="button" class="x-btn" data-act="removeCode" data-code="${esc(code)}" data-s="${esc(seller)}" aria-label="Убрать ${seller ? 'промокод' : 'сертификат'} ${esc(code)}">${ic('x', 16)}</button></li>`;
+  }
+  function discountBlock(prices) {
+    const rows = [];
+    for (const order of prices) {
+      for (const [code, amount] of Object.entries(order.promos)) rows.push(discountRow(code, amount, order.g.sid, prices.length > 1));
+    }
+    for (const code of S.co.certificates) {
+      rows.push(discountRow(code, prices.reduce((sum, o) => sum + o.certificates[code], 0)));
+    }
+    const code = ui.codeDraft.trim().toUpperCase();
+    const sellers = prices.filter(o => o.g.seller.pro);
+    return `<div class="discount-block">
+      <form data-form="discount" class="fld ${ui.codeError ? 'err' : ''}">
+        <div class="promo-row"><input class="inp" id="discountCode" placeholder="Промокод или сертификат" aria-label="Промокод или сертификат" autocomplete="off" value="${esc(ui.codeDraft)}" aria-invalid="${!!ui.codeError}" aria-describedby="discountFeedback"><button type="submit" class="btn secondary">Применить</button></div>
+        <span id="discountFeedback" role="status" class="${ui.codeError ? 'err-t' : 'hint'}">${esc(ui.codeError || ui.codeStatus)}</span>
+      </form>
+      ${ui.chooseSeller ? `<fieldset class="discount-sellers"><legend>К какому продавцу применить ${esc(code)}?</legend>${sellers.map(({g}) => `<button type="button" class="btn secondary" data-act="chooseCodeSeller" data-s="${g.sid}">${esc(g.seller.name)}${(S.co.promo[g.sid] || []).includes(code) ? ' · уже применён' : ''}</button>`).join('')}</fieldset>` : ''}
+      ${rows.length ? `<ul class="discount-list" aria-label="Применённые коды">${rows.join('')}</ul>` : ''}
+    </div>`;
+  }
+  function applyDiscount(sellerId) {
+    const input = document.getElementById('discountCode');
+    ui.codeDraft = input.value;
+    const code = input.value.trim().toUpperCase();
+    const duplicate = 'Этот код уже применён';
+    let error = '', chooseSeller = false, appliedTo = '';
+    if (!code) error = 'Введите промокод или сертификат';
+    else if (Object.hasOwn(CERT_VALUES, code)) {
+      if (S.co.certificates.includes(code)) error = duplicate;
+      else S.co.certificates.push(code);
+    } else if (PROMO_CODES.includes(code)) {
+      const sellers = coGroups().filter(g => g.seller.pro);
+      const target = sellerId ? sellers.find(g => g.sid === sellerId) : sellers.length === 1 ? sellers[0] : null;
+      if (!sellers.length || (sellerId && !target)) error = 'Промокод или сертификат не найден';
+      else if (!target) {
+        if (sellers.every(g => (S.co.promo[g.sid] || []).includes(code))) error = duplicate;
+        else chooseSeller = true;
+      } else {
+        const codes = S.co.promo[target.sid] ||= [];
+        if (codes.includes(code)) error = duplicate;
+        else { codes.push(code); appliedTo = ` · ${target.seller.name}`; }
+      }
+    } else error = 'Промокод или сертификат не найден';
+    ui.codeError = error; ui.chooseSeller = chooseSeller; ui.codeStatus = '';
+    if (!error && !chooseSeller) {
+      ui.codeDraft = ''; ui.codeStatus = `Код ${code} применён${appliedTo}`; save();
+    }
+    render();
+    document.querySelector(chooseSeller ? '.discount-sellers button' : '#discountCode').focus({ preventScroll: true });
   }
   const ctaText = (n) => (n > 1 ? `Оформить ${n} ${plural(n, 'заказ', 'заказа', 'заказов')}` : 'Оформить заказ');
   function summary() {
-    const gs = coGroups(); const n = gs.length;
+    const gs = coGroups(); const n = gs.length; const prices = checkoutPrices(gs);
     return `<div class="sum-card" id="summary">
       <div class="h3">${n > 1 ? `${n} ${plural(n, 'заказ', 'заказа', 'заказов')}` : 'Ваш заказ'}</div>
       ${n > 1 ? `<div class="note info">${ic('info')}<div class="body">У каждого продавца своё подтверждение, своя оплата и свой срок</div></div>` : ''}
-      ${gs.map((g) => { const p = dlPrice(g); return `<div class="sum-order">
+      ${prices.map(({g, fee}) => { const p = dlPrice(g); return `<div class="sum-order">
         ${n > 1 ? `<div class="sb">${esc(g.seller.name)}</div>` : ''}
         <div class="sum-row"><span class="c2">Товары, ${g.lines.reduce((a, l) => a + l.qty, 0)} шт.</span><span class="v">${fmt(g.sum)}</span></div>
-        ${promoOff(g) ? `<div class="sum-row"><span class="c2">Скидка</span><span class="v">−${fmt(promoOff(g))}</span></div>` : ''}
-        <div class="sum-row"><span class="c2">Доставка</span><span class="v ${p === null ? 'c3' : ''}">${p === null ? 'не выбрана' : p === 0 ? 'бесплатно' : fmt(p)}</span></div>${coFee(g) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${g.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(coFee(g))}</span></div>` : ''}
+        <div class="sum-row"><span class="c2">Доставка</span><span class="v ${p === null ? 'c3' : ''}">${p === null ? 'не выбрана' : p === 0 ? 'бесплатно' : fmt(p)}</span></div>${protectedOrder(g) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${g.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(fee)}</span></div>` : ''}
       </div>`; }).join('')}
-      ${certBlock()}
+      ${discountBlock(prices)}
       <div class="sum-total" style="padding-top:0;border-top:0"><span>Итого</span><span class="v">${fmt(grand())}</span></div>
-      <button class="btn primary lg block hide-sm ${ui.loading ? 'is-loading' : ''}" data-act="submit">${ui.loading ? '<span class="spin"></span>' : ctaText(n)}</button>
-      <div class="key">${ic('card')}<div><p class="sb">Сейчас платить не нужно</p><p>Реквизиты получите, когда продавец подтвердит заказ</p></div></div>
-      <div class="key">${ic('truck')}<div><p class="sb">Сумму доставки подтвердит продавец</p><p>Стоимость рекомендованная, продавец может её изменить. Новую сумму вы увидите до оплаты</p></div></div>
-      <p class="t12 c3">Нажимая кнопку, вы принимаете <a class="link" href="#/checkout">пользовательское соглашение</a></p>
+      <button class="btn primary lg block hide-sm ${ui.loading ? 'is-loading' : ''}" data-act="submit" ${ui.loading ? 'disabled' : ''}>${ui.loading ? '<span class="spin"></span>' : ctaText(n)}</button>
+      ${paymentNote()}
+      ${checkoutNote('truck', 'Сумму доставки подтвердит продавец', 'Стоимость рекомендованная, продавец может её изменить. Новую сумму вы увидите до оплаты')}
+      <p class="t12 c3">Нажимая кнопку, вы принимаете <a class="link co-underline" href="${SITE}/user-agreement" target="_blank" rel="noopener">пользовательское соглашение</a></p>
     </div>`;
   }
   const cityList = (v) => { const list = CITIES.filter((c) => !v || c.toLowerCase().startsWith(v.toLowerCase())); return list.length ? `<div class="dd-menu" style="position:absolute"><div class="dd-list" role="listbox">${list.map((c) => `<button type="button" role="option" class="dd-o" data-act="city" data-v="${c}"><span>${c}</span></button>`).join('')}</div></div>` : ''; };
+  const contactKeys = ['fio', 'email', 'phone'];
+  const recipientValue = (key) => ui.recipientDraft?.[key] ?? S.form[key];
+  function checkoutHeading(step, title) {
+    return `<div class="co-hd"><span class="n">${step}</span><h2 class="h3" id="s${step}">${title}</h2></div>`;
+  }
+  function checkoutLink(label, action, attrs = '', icon = 'plus') {
+    return `<button type="button" class="linkbtn" data-act="${action}" ${attrs}>${icon ? ic(icon, 16) : ''}${label}</button>`;
+  }
+  function closeHeading(label, target, action, attrs = '') {
+    return `<div class="lbl-row"><label class="lbl" for="${target}">${label}</label><button type="button" class="x-btn" aria-label="Закрыть: ${label}" data-act="${action}" ${attrs}>${ic('x', 16)}</button></div>`;
+  }
+  function recipientBlock() {
+    if (isAuth() && !ui.recipientDraft) return `<div class="recipient-summary"><strong>${esc(S.form.fio)}</strong><span>${esc(S.form.email)}</span><span>${esc(S.form.phone)}</span>${checkoutLink('Редактировать', 'recipientEdit', '', '')}</div>`;
+    return `<div class="form-grid">${field('fio')}${field('email', 'col3')}${field('phone', 'col3')}</div>${ui.recipientDraft ? '<div class="recipient-actions"><button class="btn secondary" data-act="recipientSave">Сохранить</button><button class="linkbtn" data-act="recipientCancel">Отмена</button></div>' : ''}`;
+  }
+  function checkoutNote(icon, title, body, cls = '') {
+    return `<div class="key ${cls}">${ic(icon)}<div><p class="sb">${title}</p><p>${body}</p></div></div>`;
+  }
+  function paymentNote(cls = '') {
+    const protectedAll = coGroups().every(protectedOrder);
+    return checkoutNote('card', 'Сейчас платить не нужно', protectedAll ? 'Оплатите заказ онлайн после подтверждения продавцом' : 'Способ оплаты указан в заказе. Дождитесь подтверждения продавца', cls);
+  }
   function pageCheckout() {
     const gs = coGroups();
     if (!gs.length) { setTimeout(() => go('#/cart'), 0); return ''; }
-    if (isAuth() && !S.form.email) Object.assign(S.form, { email: 'ivanov@example.com', phone: '+7 (900) 123-45-67', fio: 'Иванов Иван Иванович' });
+    if (isAuth()) {
+      const contact = { email: 'ivanov@example.com', phone: '+7 (900) 123-45-67', fio: 'Иванов Иван Иванович' };
+      for (const key of contactKeys) if (!S.form[key]) S.form[key] = contact[key];
+    }
     const cityErr = (ui.submitted || ui.touched.city) && !S.co.city;
     const st = ui.coStep; const names = ['Получатель', 'Доставка', 'Оплата', 'Проверка'];
-    const mobileBtn = st < 4 ? '<button class="btn primary lg" data-act="coNext">Далее</button>' : `<button class="btn primary lg ${ui.loading ? 'is-loading' : ''}" data-act="submit">${ui.loading ? '<span class="spin"></span>' : ctaText(gs.length)}</button>`;
+    const mobileBtn = st < 4 ? '<button class="btn primary lg" data-act="coNext">Далее</button>' : `<button class="btn primary lg ${ui.loading ? 'is-loading' : ''}" data-act="submit" ${ui.loading ? 'disabled' : ''}>${ui.loading ? '<span class="spin"></span>' : ctaText(gs.length)}</button>`;
     return `<div class="wrap page focus-page">
       <div class="co-wrap" data-step="${st}">
       <a class="back ${st > 1 ? 'hide-below-d' : ''}" href="#/cart">${ic('left', 16)}Вернуться в корзину</a>
@@ -1073,13 +1304,13 @@
       ${S.banner ? `<div class="note ${S.banner.kind}" style="margin-bottom:12px" role="alert">${ic('alert')}<div class="body">${esc(S.banner.text)}</div></div>` : ''}
       <div class="two co">
         <div>
-          <div class="key st st-3 hide-d" style="margin-bottom:12px;background:var(--surface)">${ic('card')}<div><p class="sb">Сейчас платить не нужно</p><p>Реквизиты получите, когда продавец подтвердит заказ</p></div></div>
+          ${paymentNote('st st-3 hide-d')}
           ${isAuth() ? '' : '<div class="guest-bar st st-1"><span class="c2">Оформляете как гость. Аккаунт создадим автоматически</span><span>Уже есть аккаунт? <button class="linkbtn" data-act="login">Войти</button></span></div>'}
-          <section class="co-sec st st-1" aria-labelledby="s1"><div class="co-hd"><span class="n">1</span><h2 class="h3" id="s1">Получатель</h2></div>
+          <section class="co-sec st st-1" aria-labelledby="s1">${checkoutHeading(1, 'Получатель')}
             <p class="co-sub">Заказ выдадут по этим данным, проверьте их</p>
-            <div class="form-grid">${field('fio')}${field('email', 'col3')}${field('phone', 'col3')}</div>
+            ${recipientBlock()}
           </section>
-          <section class="co-sec st st-2" aria-labelledby="s2"><div class="co-hd"><span class="n">2</span><h2 class="h3" id="s2">Доставка</h2></div>
+          <section class="co-sec st st-2" aria-labelledby="s2">${checkoutHeading(2, 'Доставка')}
             <div class="fld city-box ${cityErr ? 'err' : ''}" data-fld="city">
               <label class="lbl" for="city">Город получателя</label>
               <input class="inp" id="city" autocomplete="off" role="combobox" aria-expanded="${ui.cityOpen}" placeholder="Начните вводить город" value="${esc(S.co.cityTxt)}">
@@ -1088,8 +1319,8 @@
             </div>
             ${gs.map((g, i) => sellerBlock(g, i, gs.length)).join('')}
           </section>
-          <section class="co-sec st st-3" aria-labelledby="s3"><div class="co-hd"><span class="n">3</span><h2 class="h3" id="s3">Оплата</h2></div>
-            ${gs.map((g, i) => payBlock(g, i, gs.length)).join('')}
+          <section class="co-sec st st-3" aria-labelledby="s3">${checkoutHeading(3, 'Оплата')}
+            ${checkoutPrices(gs).map(({g, total}, i) => payBlock(g, i, gs.length, total)).join('')}
           </section>
         </div>
         <aside class="two-side st st-4" aria-label="Итог">${summary()}</aside>
@@ -1104,34 +1335,37 @@
       if (!S.co.city) return '[data-fld="city"]';
       for (const g of coGroups()) { const d = S.co.dl[g.sid]; if (!d || (DELIVERY[d].needs === 'pvz' && !S.co.pvz[g.sid])) return `#so-${g.sid}`; }
       for (const n of ['street', 'house', 'index']) if (fieldError(n)) return `[data-fld="${n}"]`;
-      for (const g of coGroups()) { const a = S.co.addr && S.co.addr[g.sid]; if (a && S.co.dl[g.sid] && DELIVERY[S.co.dl[g.sid]].needs === 'address' && (!a.street || !a.house)) return `#so-${g.sid}`; }
+      for (const g of addressOrders().slice(1)) {
+        if (!S.co.addr?.[g.sid]) continue;
+        for (const key of ['street', 'house', 'index']) {
+          if (ownAddressError(g.sid, key)) return `[data-own-field="${g.sid}-${key}"]`;
+        }
+      }
     }
     return null;
   }
-  function firstError() {
-    for (const n of ['fio', 'email', 'phone']) if (fieldError(n)) return `[data-fld="${n}"]`;
-    if (!S.co.city) return '[data-fld="city"]';
-    for (const g of coGroups()) { const d = S.co.dl[g.sid]; if (!d || (DELIVERY[d].needs === 'pvz' && !S.co.pvz[g.sid])) return `#so-${g.sid}`; }
-    for (const n of ['street', 'house', 'index']) if (fieldError(n)) return `[data-fld="${n}"]`;
-    for (const g of coGroups()) { const a = S.co.addr && S.co.addr[g.sid]; if (a && S.co.dl[g.sid] && DELIVERY[S.co.dl[g.sid]].needs === 'address' && (!a.street || !a.house)) return `#so-${g.sid}`; }
-    return null;
-  }
   function submit() {
+    if (ui.loading) return;
     ui.submitted = true;
-    const bad = firstError();
+    if (!saveRecipient()) return;
+    const bad = stepError(1) || stepError(2);
     if (bad) {
       ui.coStep = /fio|email|phone/.test(bad) ? 1 : 2;
       render();
       const el = document.querySelector(bad);
-      if (el) { el.scrollIntoView({ block: 'center' }); const inp = el.querySelector('input'); if (inp && inp.type !== 'radio') inp.focus({ preventScroll: true }); }
+      if (el) {
+        ui.modal = { checkoutError: bad, message: el.querySelector('.err-t')?.textContent || 'Проверьте данные заказа' };
+        overlay(); ovEl.querySelector('button[data-act="fixCheckout"]').focus();
+      }
       return;
     }
     ui.loading = true; render();
     setTimeout(() => {
       ui.loading = false;
       const f = S.flags.fail;
-      if (f === 'changed' && !S.co.surcharge) {
-        S.co.surcharge = {}; const g = coGroups()[0]; S.co.surcharge[g.sid] = 150;
+      const changedOrder = f === 'changed' && !S.co.surcharge && coGroups().find(g => dlPrice(g) > 0);
+      if (changedOrder) {
+        S.co.surcharge = { [changedOrder.sid]: 150 };
         S.banner = { kind: 'warn', text: 'Сумма заказа изменилась! Проверьте и подтвердите ваш заказ снова' };
         render(); window.scrollTo(0, 0); return;
       }
@@ -1145,14 +1379,17 @@
         S.banner = { kind: 'bad', text: 'У вас отрицательный баланс, пополните его в личном кабинете' };
         render(); window.scrollTo(0, 0); return;
       }
-      makeOrders(); S.cart = S.cart.filter((c) => !c.on || isOut(c)); S.banner = null; S.co.surcharge = null;
+      makeOrders();
+      for (const o of S.orders) delete S.co.promo[o.sid];
+      S.co.certificates = []; resetCodeEntry();
+      S.cart = S.cart.filter((c) => !c.on || isOut(c)); S.banner = null; S.co.surcharge = null;
       save(); ui.submitted = false; ui.touched = {}; go('#/success');
     }, 900);
   }
   function makeOrders() {
     const d48 = new Date(Date.now() + 48 * 3600000);
-    S.orders = coGroups().map((g, i) => ({
-      no: 464801 + i, sid: g.sid, dl: S.co.dl[g.sid], pay: S.co.pay[g.sid], pvz: S.co.pvz[g.sid], sum: g.sum, delivery: dlPrice(g) || 0, fee: coFee(g), total: orderTotal(g) - (i === 0 ? certOff(coGroups().reduce((a, x) => a + orderTotal(x), 0)) : 0), deadline: d48.getTime(),
+    S.orders = checkoutPrices().map(({g, promos, certificates, fee, total}, i) => ({
+      no: 464801 + i, sid: g.sid, dl: S.co.dl[g.sid], pay: S.co.pay[g.sid] === 'safe' ? 'card' : S.co.pay[g.sid], safe: protectedOrder(g), pvz: DELIVERY[S.co.dl[g.sid]].needs === 'pvz' ? S.co.pvz[g.sid] : null, sum: g.sum, delivery: dlPrice(g) || 0, promos, certificates, fee, total, deadline: d48.getTime(),
       lines: g.lines.map((l) => ({ id: l.id, qty: l.qty })),
     }));
     S.wonDone = (S.wonDone || []).concat(coGroups().reduce((a, g) => a.concat(g.lines.filter((l) => l.item.lot).map((l) => l.id)), []));
@@ -1166,8 +1403,10 @@
 
   /* ---------- Успех ---------- */
   const isConfirmed = (o) => S.flags.autoConfirm && SELLERS[o.sid].pro;
+  const orderSafe = (o) => o.safe ?? (o.pay === 'safe');
+  const orderMethod = (o) => o.pay === 'safe' ? 'card' : o.pay;
   function timeline(o, confirmed, email, multi) {
-    const s = SELLERS[o.sid]; const cash = o.pay === 'cash'; const safe = o.pay === 'safe'; const pickup = o.dl === 'pickup';
+    const s = SELLERS[o.sid]; const cash = o.pay === 'cash'; const safe = orderSafe(o); const pickup = o.dl === 'pickup';
     const dl = dateStr(new Date(o.deadline));
     const steps = [
       confirmed ? { t: 'Продавец подтвердил заказ', d: 'Автоматически, сразу после оформления' } : { t: multi ? 'Продавцы подтвердят заказы' : 'Продавец подтвердит заказ', d: `До ${dl}. Если продавец не ответит за 48 часов, заказ отменится автоматически` },
@@ -1178,18 +1417,25 @@
     const cur = confirmed ? 1 : 0;
     return `<ol class="tl">${steps.map((x, i) => `<li class="${i < cur ? 'done' : i === cur ? 'now' : ''}"><span class="d">${i < cur ? ic('check', 14) : i + 1}</span><div><p class="tl-t">${esc(x.t)}</p><p class="tl-d">${esc(x.d)}</p></div></li>`).join('')}</ol>`;
   }
+  function appliedOrderDiscounts(o) {
+    const row = (type, [code, amount]) => amount > 0 ? `<div class="sum-row"><span class="c2">${type} ${esc(code)}</span><span class="v">−${fmt(amount)}</span></div>` : '';
+    return Object.entries(o.promos || {}).map(entry => row('Промокод', entry)).join('') +
+      Object.entries(o.certificates || {}).map(entry => row('Сертификат', entry)).join('');
+  }
   function orderCard(o) {
     const s = SELLERS[o.sid]; const confirmed = isConfirmed(o);
     const first = byId(o.lines[0].id);
     const names = o.lines.map((l) => byId(l.id).title).join(', ');
     const count = o.lines.reduce((a, l) => a + l.qty, 0);
-    const pvz = PVZ.find((p) => p.id === o.pvz);
+    const pvz = DELIVERY[o.dl].needs === 'pvz' && PVZ.find((p) => p.id === o.pvz);
     return `<section class="card stack-12">
       <div class="between"><span class="sb t16">Заказ №${o.no}</span><span class="tag ${confirmed ? 'ok' : 'warn'}">${confirmed ? 'Ожидает оплату' : 'Ожидает подтверждения'}</span></div>
       <div class="oc-row"><img src="${first.img}" alt=""><div style="min-width:0"><p class="sb" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(names)}</p><p class="t12 c3">${count} шт. · продавец ${esc(s.name)}</p></div></div>
       <div class="oc-rows">
         <div class="sum-row"><span class="c2">${DELIVERY[o.dl].title}${pvz ? ', ' + pvz.name : ''}</span><span class="v">${o.delivery ? fmt(o.delivery) : 'бесплатно'}</span></div>
-        <div class="sum-row"><span class="c2">${PAYWAY[o.pay].title}</span><span class="v sb">Итого ${fmt(o.total)}</span></div>
+        ${o.fee > 0 && orderSafe(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка</span><span class="v">${fmt(o.fee)}</span></div>` : ''}
+        ${appliedOrderDiscounts(o)}
+        <div class="sum-row"><span class="c2">${PAYWAY[orderMethod(o)].title}${orderSafe(o) ? ' · Безопасная сделка' : ''}</span><span class="v sb">Итого ${fmt(o.total)}</span></div>
       </div>
     </section>`;
   }
@@ -1208,12 +1454,12 @@
     const nums = os.map((o) => '№' + o.no).join(', ');
     const title = allConf ? (multi ? `Заказы ${nums} подтверждены` : `Заказ ${nums} подтверждён`) : (multi ? `Заказы ${nums} оформлены` : `Заказ ${nums} оформлен`);
     const okPlay = ui.okAnim !== nums; ui.okAnim = nums;
-    return `<div class="wrap page"><div class="ok-page stack-12">
+    return `<div class="wrap page success-wrap"><div class="ok-page stack-12">
       <header class="ok-hd"><span class="ok-ic${okPlay ? ' play' : ''}"><svg viewBox="0 0 56 56" width="56" height="56" aria-hidden="true"><circle class="ok-c" cx="28" cy="28" r="28"/><path class="ok-k" d="M16 29l8 8 16-17" pathLength="1"/></svg></span><h1 class="h1">${title}</h1></header>
       ${multi ? `<div class="note info">${ic('info')}<div class="body">Это ${os.length} отдельных заказа: у каждого продавца своё подтверждение, оплата и доставка</div></div>` : ''}
       <section class="card">
         <h2 class="h3" style="margin-bottom:16px">Что будет дальше</h2>${timeline(os[0], allConf, S.buyer.email, multi)}
-        <div class="tg-box sub-box"><div><h3 class="h3">Следите за заказом</h3><p class="c2">Подключите уведомления, и мы сообщим, когда продавец ответит</p></div><div class="row"><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте"><img src="assets/vk-logo.svg" alt="" width="20" height="20">ВКонтакте</button><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте"><img src="assets/tg.svg" alt="" width="20" height="20">Телеграм</button></div></div>
+        <div class="tg-box sub-box"><div><h3 class="h3">Следите за заказом</h3><p class="c2">Подключите уведомления, и мы сообщим, когда продавец ответит</p></div><div class="row"><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте" aria-label="ВКонтакте"><img src="assets/vk-logo.svg" alt="" width="20" height="20"><span>ВКонтакте</span></button><button class="btn secondary" data-act="soon" data-text="Подключение уведомлений оставляем как на сайте" aria-label="Телеграм"><img src="assets/tg.svg" alt="" width="20" height="20"><span>Телеграм</span></button></div></div>
       </section>
       ${isAuth() ? `<section class="card stack-8"><h2 class="h3">Контакт для связи</h2><p class="c2">Продавец сможет написать вам, если появятся вопросы по заказу</p><div class="row contact-row"><input class="inp" id="contactI" placeholder="Телеграм или ВК" aria-label="Контакт для связи"><button class="btn secondary" data-act="contactSave">Сохранить</button></div></section>` : accountBlock()}
       ${os.map(orderCard).join('')}
@@ -1248,21 +1494,23 @@
     { no: 464809, st: 'pay', dl: 'pickup', pay: 'cash', left: 70, lines: [{ id: 'brutalis', qty: 1 }] },
     { no: 464808, st: 'pay', dl: 'yd', pay: 'safe', left: 70, lines: [{ id: 'assassins', qty: 1 }] },
     { no: 464806, st: 'paid', dl: 'cdek', pay: 'card', left: 30, lines: [{ id: 'darkshroud', qty: 1 }], receipt: 'чек-464806.pdf' },
+    { no: 464805, st: 'paid', dl: 'yd', pay: 'safe', left: 62, lines: [{ id: 'strudd', qty: 1 }] },
     { no: 464803, st: 'process', dl: 'post', pay: 'card', left: 62, lines: [{ id: 'warriors', qty: 1 }], receipt: 'чек-464803.jpg' },
     { no: 464798, st: 'sent', dl: 'post', pay: 'card', left: 120, lines: [{ id: 'trukk', qty: 1 }], track: '80080012345678', receipt: 'чек-464798.png' },
     { no: 464790, st: 'got', dl: 'yd', pay: 'card', lines: [{ id: 'prisoners', qty: 2 }], track: 'YD102938475', receipt: 'чек-464790.pdf' },
+    { no: 464788, st: 'got', dl: 'yd', pay: 'card', lines: [{ id: 'prisoners', qty: 2 }], review: { stars: 5, text: 'Всё пришло вовремя, упаковано хорошо' } },
     { no: 464781, st: 'dispute', dl: 'post', pay: 'card', stop: 5, lines: [{ id: 'arkham', qty: 1 }], track: '80080098765432', receipt: 'чек-464781.pdf', by: 'buyer' },
     { no: 464774, st: 'cancel', dl: 'post', pay: 'card', stop: 3, wasProcess: true, why: 'Продавец не отправил заказ в срок', lines: [{ id: 'yucatan', qty: 1 }] },
     { no: 464760, st: 'cancel', dl: 'pickup', pay: 'cash', stop: 1, why: 'Продавец не ответил за 48 часов', lines: [{ id: 'lutazy', qty: 1 }] },
   ];
-  const newOrders = () => (S.orders || []).map((o) => ({ no: o.no, st: isConfirmed(o) ? (o.pay === 'cash' ? 'process' : 'pay') : 'approve', dl: o.dl, pay: o.pay, left: isConfirmed(o) ? 72 : 48, lines: o.lines, fee: o.fee }));
+  const newOrders = () => (S.orders || []).map((o) => ({ no: o.no, st: isConfirmed(o) ? (o.pay === 'cash' ? 'process' : 'pay') : 'approve', dl: o.dl, pay: orderMethod(o), safe: orderSafe(o), left: isConfirmed(o) ? 72 : 48, lines: o.lines, promos: o.promos, certificates: o.certificates, fee: o.fee, total: o.total, delivery: o.delivery }));
   const lkOrders = () => (S.flags.noOrders ? [] : newOrders().concat(LK_BASE).map((o) => Object.assign({}, o, (S.lkO || {})[o.no])));
   const lkGet = (no) => lkOrders().find((o) => o.no === +no);
   const lkPatch = (no, p) => { S.lkO = S.lkO || {}; S.lkO[no] = Object.assign({}, S.lkO[no], p); save(); };
   const lkSeller = (o) => byId(o.lines[0].id).seller;
   const lkSum = (o) => o.lines.reduce((a, l) => a + byId(l.id).price * l.qty, 0);
-  const lkFee = (o) => (o.pay === 'safe' ? (o.fee || safeFee(lkSum(o))) : 0);
-  const lkTotal = (o) => lkSum(o) + DELIVERY[o.dl].price + lkFee(o);
+  const lkFee = (o) => (orderSafe(o) ? (o.fee ?? safeFee(lkSum(o))) : 0);
+  const lkTotal = (o) => o.total ?? (lkSum(o) + DELIVERY[o.dl].price + lkFee(o));
   const OST = {
     approve: { t: 'Ожидает подтверждения', c: 'wait' }, pay: { t: 'Ожидает оплату', c: 'act' }, paid: { t: 'Произведена оплата', c: 'wait' }, process: { t: 'В обработке', c: 'wait' },
     sent: { t: 'Отправлен', c: 'act' }, got: { t: 'Получен', c: 'ok' }, dispute: { t: 'Спор', c: 'bad' }, cancel: { t: 'Отменён', c: 'mute' },
@@ -1272,8 +1520,8 @@
     const d = (h) => `${atH(h)}, осталось ${hrsLeft(h)}`;
     if (o.st === 'approve') return { h: 'Ждём ответ продавца', p: 'Он проверит наличие и стоимость доставки. Платить пока не нужно. Если не ответит, заказ отменится', d: `Ответ до ${d(o.left)}` };
     if (o.st === 'pay' && o.pay === 'cash') return { h: 'Оплата при встрече', p: `Договоритесь с ${s.name} о месте и времени. Чек загружать не нужно`, d: `Встреча до ${d(o.left)}` };
-    if (o.st === 'pay' && o.pay === 'safe') return { h: 'Оплатите заказ онлайн', p: 'Деньги останутся у нас и перейдут продавцу, когда вы подтвердите получение', d: `Оплатить до ${d(o.left)}` };
-    if (o.st === 'paid' && o.pay === 'safe') return { h: 'Деньги у сервиса', p: 'Продавец готовит заказ. Он получит деньги, когда вы подтвердите получение', d: `Отправка до ${d(o.left)}` };
+    if (o.st === 'pay' && orderSafe(o)) return { h: 'Оплатите заказ онлайн', p: 'Деньги останутся у нас и перейдут продавцу, когда вы подтвердите получение', d: `Оплатить до ${d(o.left)}` };
+    if (o.st === 'paid' && orderSafe(o)) return { h: 'Деньги у сервиса', p: 'Продавец готовит заказ. Он получит деньги, когда вы подтвердите получение', d: `Отправка до ${d(o.left)}` };
     if (o.st === 'pay') return { h: 'Оплатите заказ', p: 'Переведите сумму продавцу и приложите чек. Если не успеть, заказ отменится', d: `Оплатить до ${d(o.left)}` };
     if (o.st === 'paid') return { h: 'Продавец проверяет оплату', p: 'Если он не ответит, через 48 часов заказ сам перейдёт в обработку', d: `Проверка до ${d(o.left)}` };
     if (o.st === 'process') return { h: 'Продавец готовит заказ', p: 'Когда он отправит посылку, здесь появится трек-номер', d: `Отправка до ${d(o.left)}` };
@@ -1284,7 +1532,7 @@
   }
   /* ---------- ЛК: заказ, шаги ---------- */
   function lkTimeline(o) {
-    const cash = o.pay === 'cash'; const safe = o.pay === 'safe'; const pickup = o.dl === 'pickup';
+    const cash = o.pay === 'cash'; const safe = orderSafe(o); const pickup = o.dl === 'pickup';
     const steps = [
       { done: 'Заказ оформлен', now: 'Заказ оформлен', d: '' },
       { done: 'Продавец подтвердил заказ', now: 'Продавец подтверждает заказ', d: 'Проверяет наличие и стоимость доставки' },
@@ -1299,7 +1547,7 @@
     return `<ol class="tl">${steps.map((x, i) => (i < cur ? li('done', i + 1, x.done, '') : i === cur ? li('now', i + 1, x.now, x.d) : li('', i + 1, x.now, ''))).join('')}</ol>`;
   }
   function lkMainAct(o) {
-    if (o.st === 'pay' && o.pay !== 'cash') return `<button class="btn primary lg block" data-act="payOpen" data-no="${o.no}">${o.pay === 'safe' ? `Оплатить ${fmt(lkTotal(o))}` : 'Оплатить'}</button>`;
+    if (o.st === 'pay' && o.pay !== 'cash') return `<button class="btn primary lg block" data-act="payOpen" data-no="${o.no}">${orderSafe(o) ? `Оплатить ${fmt(lkTotal(o))}` : 'Оплатить'}</button>`;
     if (o.st === 'sent') return `<button class="btn primary lg block" data-act="cfm" data-k="got" data-no="${o.no}">Заказ получен</button>`;
     if (o.st === 'got' && !o.review && !S.flags.minus) return `<button class="btn primary lg block" data-act="revOpen" data-no="${o.no}">Оставить отзыв</button>`;
     if (o.st === 'cancel' && o.wasProcess && !o.review && !S.flags.minus) return `<button class="btn secondary lg block" data-act="revOpen" data-no="${o.no}">Оставить отзыв</button>`;
@@ -1320,6 +1568,7 @@
     if (!o) return lkShell('orders', `<div class="empty"><p class="h3">Заказ не найден</p><a class="btn primary" style="margin-top:16px" href="#/lk/orders">Все покупки</a></div>`);
     const s = SELLERS[lkSeller(o)]; const st = OST[o.st]; const n = lkNext(o); const D = DELIVERY[o.dl];
     const row = (k, v) => `<div class="info-r"><dt>${k}</dt><dd>${v}</dd></div>`;
+    const delivery = o.delivery ?? D.price;
     const main = lkMainAct(o); const manage = lkManage(o);
     return lkShell('orders', `<a class="back" href="#/lk/orders">${ic('left', 16)}Все покупки</a>
       <div class="ordp-hd"><h1 class="h1">Заказ №${o.no}</h1><span class="ost ${st.c}">${st.t}</span></div>
@@ -1332,14 +1581,14 @@
           <section class="card"><h2 class="h3 ordp-t">Доставка и оплата</h2><dl class="info">
             ${row('Способ получения', esc(D.title))}
             ${o.track ? row('Трек-номер', `${esc(o.track)} <button class="linkbtn" data-act="copy" data-v="${esc(o.track)}">Скопировать</button>`) : ''}
-            ${row('Способ оплаты', esc(PAYWAY[o.pay].title))}
+            ${row('Способ оплаты', esc(PAYWAY[orderMethod(o)].title))}
             ${o.receipt ? row('Чек', `<button class="linkbtn" data-act="soon" data-text="Файл открывается в новой вкладке">${ic('clip', 16)}${esc(o.receipt)}</button>`) : ''}
           </dl></section>
         </div>
         <aside class="stack-12 ordp-side">
-          <section class="card stack-8"><div class="sum-row"><span class="c2">Товары</span><span class="v">${fmt(lkSum(o))}</span></div><div class="sum-row"><span class="c2">Доставка</span><span class="v">${D.price ? fmt(D.price) : 'бесплатно'}</span></div>${lkFee(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(lkFee(o))}</span></div>` : ''}<div class="sum-total"><span>Итого</span><span class="v">${fmt(lkTotal(o))}</span></div>${main}</section>
+          <section class="card stack-8 lk-order-total"><div class="sum-row"><span class="c2">Товары</span><span class="v">${fmt(lkSum(o))}</span></div><div class="sum-row"><span class="c2">Доставка</span><span class="v">${delivery ? fmt(delivery) : 'бесплатно'}</span></div>${appliedOrderDiscounts(o)}${lkFee(o) ? `<div class="sum-row"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="v">${fmt(lkFee(o))}</span></div>` : ''}<div class="sum-total"><span>Итого</span><span class="v">${fmt(lkTotal(o))}</span></div>${main}</section>
           <section class="card stack-8"><h2 class="h3">Продавец</h2><a class="link" href="#/reviews/${lkSeller(o)}" target="_blank">${esc(s.name)}</a><p class="c2">г. ${esc(s.city)}</p>${S.flags.minus ? '<p class="c2">Контакты скрыты: баланс ниже нуля</p>' : `<button class="btn secondary block" data-act="soon" data-text="Контакт продавца открывается в Телеграме или ВК">Написать продавцу</button>`}</section>
-          ${manage ? `<section class="card stack-8"><h2 class="h3">Действия с заказом</h2>${manage}</section>` : ''}
+          ${manage ? `<section class="card stack-8 lk-order-actions" aria-label="Действия с заказом">${manage}</section>` : ''}
         </aside>
       </div>`);
   }
@@ -1348,7 +1597,7 @@
     const count = o.lines.reduce((a, l) => a + l.qty, 0);
     return `<article class="ord ord-c card" id="o${o.no}">
       <header class="ord-hd"><div><a class="h3 ord-no" href="${url}">Заказ №${o.no}</a><p class="c2">${esc(s.name)}</p></div><span class="ost ${st.c}">${st.t}</span></header>
-      <a class="ord-it" href="${url}"><img src="${first.img}" alt=""><span class="ord-t">${esc(first.title)}${o.lines.length > 1 ? ` и ещё ${o.lines.length - 1}` : ''}<span class="c2 ord-q">${count} шт.</span></span><span class="sb ord-p">${fmt(lkTotal(o))}</span></a>
+      <a class="ord-it" href="${url}"><img src="${first.img}" alt=""><span class="ord-t">${esc(first.title)}${o.lines.length > 1 ? ` и ещё ${o.lines.length - 1}` : ''}<span class="c2 ord-q">${count} шт.</span></span><span class="sb ord-p">${fmt(lkSum(o))}</span></a>
       <div class="ord-next ${st.c} ${n.d ? 'has-d' : ''}"><p class="sb">${esc(n.h)}</p>${n.d ? `<p>${esc(n.d)}</p>` : ''}</div>
       <div class="ord-ft">${lkMainAct(o).replace('lg block', '')}<a class="btn secondary" href="${url}">Подробнее</a></div>
     </article>`;
@@ -1358,7 +1607,7 @@
     const active = (o) => !['got', 'cancel'].includes(o.st);
     const all = lkOrders();
     const hit = (o) => { const s = SELLERS[lkSeller(o)]; const hay = `${o.no} ${s.name} ${o.lines.map((l) => byId(l.id).title).join(' ')}`.toLowerCase(); return !q || hay.includes(q); };
-    let list = all.filter((o) => (tab === 'all' || (tab === 'on' ? active(o) : !active(o))) && hit(o) && (!f.st || f.st === 'all' || o.st === f.st) && (!f.pay || f.pay === 'all' || o.pay === f.pay) && (!f.dl || f.dl === 'all' || o.dl === f.dl));
+    let list = all.filter((o) => (tab === 'all' || (tab === 'on' ? active(o) : !active(o))) && hit(o) && (!f.st || f.st === 'all' || o.st === f.st) && (!f.pay || f.pay === 'all' || (f.pay === 'safe' ? orderSafe(o) : orderMethod(o) === f.pay)) && (!f.dl || f.dl === 'all' || o.dl === f.dl));
     if (f.sort === 'old') list = list.slice().reverse();
     if (f.sort === 'cheap') list = list.slice().sort((a, b) => lkTotal(a) - lkTotal(b));
     if (f.sort === 'dear') list = list.slice().sort((a, b) => lkTotal(b) - lkTotal(a));
@@ -1372,7 +1621,7 @@
       ${all.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x">${tabs.map(([k, l, n]) => `<button class="${tab === k ? 'on' : ''}" data-act="lkTab" data-v="${k}">${l} ${n}</button>`).join('')}</div></div>
       <div class="lk-flt"><input class="inp lk-q" id="lkQ" placeholder="Номер, товар или продавец" aria-label="Поиск по заказам" value="${esc(ui.lkQ || '')}">${dd('lkSt', f.st || 'all', stOpts, { aria: 'Статус' })}${dd('lkPay', f.pay || 'all', payOpts, { aria: 'Способ оплаты' })}${dd('lkDl', f.dl || 'all', dlOpts, { aria: 'Доставка' })}${dd('lkSort', f.sort || 'new', [['new', 'Сначала новые'], ['old', 'Сначала старые'], ['cheap', 'Сначала дешевле'], ['dear', 'Сначала дороже']], { aria: 'Сортировка' })}</div>
       ${need && tab !== 'off' ? `<p class="c2 lk-need">Ждут вашего действия: ${need}</p>` : ''}
-      ${list.length ? `<div class="stack-12">${list.map(lkCard).join('')}</div>` : `<div class="empty"><div class="ico">${ic('search', 28)}</div><p class="h3">Заказов не найдено</p><p class="c2">Измените поиск или фильтры</p></div>`}`
+      ${list.length ? `<div class="stack-12">${list.map(lkCard).join('')}</div>` : `<div class="empty"><div class="ico">${ic('search', 28)}</div><p class="h3">Заказов не найдено</p><p class="c2">Измените поиск или фильтры</p><button class="btn secondary" data-act="lkReset">Сбросить фильтры</button></div>`}`
         : `<div class="empty"><div class="ico">${ic('cart', 28)}</div><p class="h3">Пока нет покупок</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши заказы, оплата и чеки</p><a class="btn primary" href="#/catalog">Перейти в каталог</a></div>`}`);
   }
   function pageLk(r) {
@@ -1392,21 +1641,21 @@
   }
   function lkModals() {
     const m = ui.modal; if (!m) return '';
-    const wrap = (title, body, foot, label) => `<div class="scrim" data-act="closeModal"><div class="modal" role="dialog" aria-label="${esc(label || title)}" data-stop><div class="modal-hd"><span class="h3">${esc(title)}</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div><div class="modal-bd stack-12">${body}</div>${foot ? `<div class="modal-ft">${foot}</div>` : ''}</div></div>`;
-    if (m.pay && lkGet(m.pay).pay === 'safe') {
+    const wrap = (title, body, foot, label) => `<div class="scrim" data-act="closeModal"><div class="modal lk-modal" role="dialog" aria-label="${esc(label || title)}" data-stop><div class="modal-hd"><span class="h3">${esc(title)}</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div><div class="modal-bd stack-12">${body}</div>${foot ? `<div class="modal-ft">${foot}</div>` : ''}</div></div>`;
+    if (m.pay && orderSafe(lkGet(m.pay))) {
       const o = lkGet(m.pay);
       return wrap(`Оплата заказа №${o.no}`, `<div class="reqs"><div class="req"><span class="c2">Товары и доставка</span><span class="req-v sb">${fmt(lkTotal(o) - lkFee(o))}</span></div><div class="req"><span class="c2">Безопасная сделка ×${o.lines.reduce((a, l) => a + l.qty, 0)}</span><span class="req-v sb">${fmt(lkFee(o))}</span></div></div><div class="note ok">${ic('shield')}<div class="body">Деньги хранятся у нас, пока вы не получите заказ. Чек загружать не нужно</div></div>`, `<button class="btn primary lg block" data-act="safePay">Оплатить ${fmt(lkTotal(o))}</button>`);
     }
     if (m.pay) {
       const o = lkGet(m.pay); const s = SELLERS[lkSeller(o)];
-      const row = (k, v, copy) => `<div class="req"><span class="c2">${k}</span><span class="req-v sb">${esc(v)}</span><button class="linkbtn t12" data-act="copy" data-v="${esc(copy || v)}">Скопировать</button></div>`;
-      return wrap(`Оплата заказа №${o.no}`, `<div class="note warn">${ic('alert')}<div class="body">Оплатите до ${esc(atH(o.left))}, осталось ${esc(hrsLeft(o.left))}. Иначе заказ отменится</div></div>
+      const row = (k, v, copy) => `<div class="req"><span class="c2">${k}</span><span class="req-v sb">${esc(v)}</span><button class="lk-copy" aria-label="Скопировать: ${esc(k)}" data-act="copy" data-v="${esc(copy || v)}"><svg class="i" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 5V4a1 1 0 0 0-1-1H5a2 2 0 0 0-2 2v10a1 1 0 0 0 1 1h1"/></svg></button></div>`;
+      return wrap(`Оплата заказа №${o.no}`, `<div class="note warn">${ic('alert')}<div class="body">Оплатите до ${esc(atH(o.left))}, иначе заказ отменится</div></div>
         <div class="reqs">${row('Сумма', fmt(lkTotal(o)), String(lkTotal(o)))}${row('Номер карты', '2200 1234 5678 9012')}${row('Получатель', `${s.name}, Иван П.`)}</div>
         ${rcBlock()}`, `<button class="btn primary lg block ${ui.rcBusy ? 'is-loading' : ''}" data-act="rcSend">${ui.rcBusy ? '<span class="spin"></span>' : 'Отправить чек'}</button>`);
     }
     if (m.cfm) {
-      const O = m.no ? lkGet(m.no) : null; const T = { got: ['Подтвердить получение?', O && O.pay === 'safe' ? 'После подтверждения продавец получит деньги, а открыть спор будет нельзя' : 'После подтверждения нельзя будет открыть спор', 'Заказ получен', 'primary'], openDispute: ['Открыть спор?', 'Напишите нам на почту: укажите номер заказа и опишите причину', 'Открыть спор', 'primary'], cancel: ['Отменить заказ?', 'Заказ отменится для вас и продавца. Вернуть его будет нельзя', 'Отменить заказ', 'primary'], askCancel: ['Запросить отмену?', 'Продавец получит запрос. Заказ отменится, если он согласится, и он вернёт деньги напрямую', 'Отправить запрос', 'primary'], closeDispute: ['Закрыть спор?', 'Заказ вернётся в статус «Отправлен»', 'Закрыть спор', 'primary'], dropLot: ['Отказаться от лота?', 'За отказ от выигранного лота спишется штраф. Лот вернётся продавцу', 'Отказаться', 'primary'] }[m.cfm];
-      const alt = '';
+      const O = m.no ? lkGet(m.no) : null; const T = { got: ['Подтвердить получение?', O && orderSafe(O) ? 'После подтверждения продавец получит деньги, а открыть спор будет нельзя' : 'После подтверждения нельзя будет открыть спор. Открыть спор можно здесь, если что-то не так', 'Заказ получен', 'primary'], openDispute: ['Открыть спор?', 'Напишите нам на почту: укажите номер заказа и опишите причину', 'Открыть спор', 'primary'], cancel: ['Отменить заказ?', 'Заказ отменится для вас и продавца. Вернуть его будет нельзя', 'Отменить заказ', 'primary'], askCancel: ['Запросить отмену?', 'Продавец получит запрос. Заказ отменится, если он согласится, и он вернёт деньги напрямую', 'Отправить запрос', 'primary'], closeDispute: ['Закрыть спор?', 'Заказ вернётся в статус «Отправлен»', 'Закрыть спор', 'primary'], dropLot: ['Отказаться от лота?', 'За отказ от выигранного лота спишется штраф. Лот вернётся продавцу', 'Отказаться', 'primary'] }[m.cfm];
+      const alt = m.cfm === 'got' ? `<button class="btn secondary block" data-act="cfm" data-k="openDispute" data-no="${m.no}">Открыть спор</button>` : '';
       return wrap(T[0], `<p class="c2">${esc(T[1])}</p>`, `<button class="btn primary block" data-act="cfmDo" data-k="${m.cfm}">${T[2]}</button>${alt}<button class="btn ghost block" data-act="closeModal">Назад</button>`);
     }
     if (m.dl) {
@@ -1416,17 +1665,20 @@
     if (m.rev) {
       const r = ui.rv || {};
       return wrap('Отзыв о заказе', `<div><p class="lbl-b">Оценка</p><div class="rate-in">${[1, 2, 3, 4, 5].map((x) => `<button class="${x <= (r.stars || 0) ? 'on' : ''}" data-act="revStar" data-v="${x}" aria-label="${x} из 5">${STAR}</button>`).join('')}</div>${r.errS ? `<p class="err-t">${ic('alert', 14)}<span>Поставьте оценку</span></p>` : ''}</div>
-        <label class="fld"><span class="lbl">Ваш отзыв</span><textarea class="inp" id="revText" rows="4">${esc(r.text || '')}</textarea>${r.errT ? `<span class="err-t">${ic('alert', 14)}<span>Напишите отзыв</span></span>` : ''}</label>
+        <label class="fld ${r.errT ? 'err' : ''}"><span class="lbl">Ваш отзыв</span><textarea class="inp" aria-invalid="${!!r.errT}" id="revText" rows="4">${esc(r.text || '')}</textarea>${r.errT ? `<span class="err-t">Напишите отзыв</span>` : ''}</label>
         <button class="linkbtn" data-act="soon" data-text="Прикрепление изображений как на сайте">${ic('clip', 16)}Добавить изображения</button>`, `<button class="btn primary lg block" data-act="revSend">Опубликовать</button>`);
     }
     if (m.bidsOf) {
       const a = byAny(m.bidsOf); const l = lotInfo(a); const n = Math.min(l.bids, 6);
-      const rows = Array.from({ length: n }, (_, i) => `<div class="req"><span class="c2">${i === 0 && l.ls.my === l.price ? 'Вы' : `User${51234 - i * 73}`}</span><span class="req-v sb">${fmt(l.price - i * l.step)}</span><span class="t12 c3">${atH(-(i + 1) * 3)}</span></div>`).join('');
+      const rows = Array.from({ length: n }, (_, i) => {
+        const price = l.history?.[i] ?? l.price - i * l.step;
+        return `<div class="req"><span class="c2">${l.ls.my === price ? 'Вы' : `User${51234 - i * 73}`}</span><span class="req-v sb">${fmt(price)}</span><span class="t12 c3">${atH(-(i + 1) * 3)}</span></div>`;
+      }).join('');
       return wrap(`Ставки: ${l.bids}`, n ? `<div class="reqs">${rows}</div>` : '<p class="c2">Ставок пока нет</p>');
     }
     if (m.mail) {
       const sent = ui.mailSent;
-      return wrap('Подтвердите почту', `<p class="c2">Для ставки нужна подтверждённая почта. ${sent ? 'Мы отправили код на ivanov@example.com' : 'Отправим код на ivanov@example.com'}</p>${sent ? `<label class="fld"><span class="lbl">Код из письма</span><input class="inp" id="mailCode" inputmode="numeric" placeholder="1234"></label>${ui.mailErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.mailErr)}</span></p>` : ''}<button class="linkbtn" data-act="soon" data-text="Код отправлен ещё раз">Отправить код ещё раз</button>` : ''}`, sent ? `<button class="btn primary lg block" data-act="mailDo">Подтвердить и продолжить</button>` : `<button class="btn primary lg block" data-act="mailSend">Отправить код</button>`);
+      return wrap('Подтвердите почту', `<p class="c2">Для ставки нужна подтверждённая почта. ${sent ? 'Мы отправили код на ivanov@example.com' : 'Отправим код на ivanov@example.com'}</p>${sent ? `<label class="fld ${ui.mailErr ? 'err' : ''}"><span class="lbl">Код из письма</span><input class="inp" id="mailCode" aria-invalid="${!!ui.mailErr}" inputmode="numeric" value="${esc(ui.mailValue || '')}" placeholder="1234"></label>${ui.mailErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.mailErr)}</span></p>` : ''}<button class="linkbtn" data-act="soon" data-text="Код отправлен ещё раз">Отправить код ещё раз</button>` : ''}`, sent ? `<button class="btn primary lg block" data-act="mailDo">Подтвердить и продолжить</button>` : `<button class="btn primary lg block" data-act="mailSend">Отправить код</button>`);
     }
     return '';
   }
@@ -1435,9 +1687,22 @@
   const LOTX = { 'a-leman': { step: 50, reserve: 1500 }, 'a-guilliman': { step: 50, blitz: 2500 }, 'a-redemptor': { step: 50 }, 'a-deathwatch': { step: 50 }, 'a-own': { step: 50 } }; // пример: шаг, резерв и блиц-цена
   const MAX_BET = 1000000;
   function lotInfo(a) {
-    const x = LOTX[a.id] || { step: 50 }; const b = route().q.ended && LK_BIDS.find((z) => z.id === a.id); const ls = ((S.lot || {})[a.id] && S.lot[a.id].st) ? S.lot[a.id] : (b ? { st: b.st === 'wonDemo' ? 'won' : b.st, my: b.my } : ((S.lot || {})[a.id] || {}));
-    const price = ls.price || a.price; const bids = a.bids + (ls.n || 0);
-    return { x, ls, price, bids, step: x.step, next: bids ? price + x.step : price, end: T0 + a.hours * 3600000, over: ['won', 'lost', 'reserve', 'ended'].includes(ls.st) };
+    const x = LOTX[a.id] || { step: 50 };
+    const q = route().q;
+    const saved = S.lot?.[a.id] || {};
+    const previous = (q.ended || q.mine) && LK_BIDS.find((bid) => bid.id === a.id);
+    let ls = saved;
+    if (!ls.st && previous) ls = { st: previous.st === 'wonDemo' ? 'won' : previous.st, my: previous.my };
+    // При открытии завершённых торгов сохранённая активная ставка не возвращает форму.
+    if (q.ended && !['won', 'lost', 'reserve', 'ended'].includes(ls.st)) {
+      ls = previous?.st === 'wonDemo' ? { st: 'won', my: previous.my }
+        : previous?.st === 'lost' ? { st: 'lost', my: previous.my } : { st: 'closed' };
+    }
+    const price = ls.price || a.price;
+    const liveCount = a.bids + (ls.n || 0);
+    const history = !liveCount && ls.st === 'lost' && ls.my < price ? [price, ls.my] : null;
+    const bids = ls.st === 'ended' ? 0 : history?.length ?? liveCount;
+    return { x, ls, price, bids, history, step: x.step, next: bids ? price + x.step : price, end: T0 + a.hours * 3600000, over: ['won', 'lost', 'reserve', 'ended', 'closed'].includes(ls.st) };
   }
   const isOwnLot = (a) => role() === 'seller' && a.seller === OWN_SELLER;
   function bidPanel(a) {
@@ -1449,7 +1714,7 @@
     const head = l.over ? `<div class="bid-end"><span class="sb">Торги завершены</span><span class="t12 c2">${atH(-2)}</span></div>`
       : `<div class="bt-cells ${urgent ? 'urgent' : ''}" data-cells="${l.end}"><p class="bt-l">До конца торгов</p><div class="bt-row">${cell('h', 'часов')}${cell('m', 'минут')}${cell('s', 'секунд')}</div></div>`;
     const meta = `<button class="linkbtn" data-act="bidsOpen" data-id="${a.id}">${l.bids ? `${l.bids} ${plural(l.bids, 'ставка', 'ставки', 'ставок')}` : 'Ставок пока нет'}</button>${reserve}`;
-    const priceL = `<div><p class="t12 c2">${l.over ? 'Последняя ставка' : l.bids ? 'Текущая ставка' : 'Стартовая цена'}</p><p class="price-big">${fmt(l.price)}</p></div>`;
+    const priceL = `<div><p class="t12 c2">${l.bids ? (l.over ? 'Последняя ставка' : 'Текущая ставка') : 'Стартовая цена'}</p><p class="price-big">${fmt(l.price)}</p></div>`;
     const price = `<div class="bid-now">${priceL}<div class="bid-meta">${meta}</div></div>`;
     let note = '';
     if (ls.st === 'lead') note = `<div class="note ok">${ic('check')}<div class="body">Вы лидируете со ставкой ${fmt(ls.my)}${ls.auto ? `. Автоставка до ${fmt(ls.auto)}: поднимем ставку, если её перебьют` : ''}</div></div>`;
@@ -1476,7 +1741,7 @@
             <button class="btn primary lg block" id="bidOk" data-act="bidDo">Подтвердить ставку</button>
             <button class="linkbtn bid-arm-e" data-act="bidBack">Изменить сумму</button>
           </div>`
-          : `<div class="bid-f"><label class="lbl" for="bidI">Ваша ставка, ₽</label><div class="bid-row"><input class="inp" id="bidI" inputmode="numeric" value="${esc(ui.bidV !== undefined ? ui.bidV : l.next)}"><button class="btn primary" data-act="${isAuth() ? 'bidGo' : 'loginFor'}" ${isAuth() ? '' : 'data-text="Войдите, чтобы сделать ставку"'}>Сделать ставку</button></div>
+          : `<div class="bid-f"><label class="lbl" for="bidI">Ваша ставка, ₽</label><div class="bid-row"><input class="inp" id="bidI" aria-invalid="${!!ui.bidErr}" inputmode="numeric" value="${esc(ui.bidV !== undefined ? ui.bidV : l.next)}"><button class="btn primary" data-act="${isAuth() ? 'bidGo' : 'loginFor'}" ${isAuth() ? '' : 'data-text="Войдите, чтобы сделать ставку"'}>Сделать ставку</button></div>
           ${ui.bidErr ? `<p class="err-t" role="alert">${ic('alert', 14)}<span>${esc(ui.bidErr)}</span></p>` : `<p class="hint">От ${fmt(l.next)}, шаг от ${fmt(l.step)}</p>`}</div>
           ${isAuth() ? `<button class="linkbtn" data-act="autoT" aria-expanded="${!!ui.autoOpen}">Автоставка ${ic(ui.autoOpen ? 'up' : 'down', 16)}</button>
           ${ui.autoOpen ? `<div class="bid-auto"><p class="t12 c2">Поднимем вашу ставку на шаг, когда её перебьют, но не выше этой суммы</p><div class="row"><input class="inp" id="autoI" inputmode="numeric" placeholder="Сумма, ₽" aria-label="Сумма автоставки" value="${esc(ls.auto || '')}"><button class="btn secondary" data-act="autoGo">Сохранить</button></div>${ui.autoErr ? `<p class="err-t">${ic('alert', 14)}<span>${esc(ui.autoErr)}</span></p>` : ''}</div>` : ''}` : ''}
@@ -1487,14 +1752,18 @@
       ${head}${price}${note}${form}
       <ul class="facts">
         <li>${ic('truck')}<span><b>Доставка.</b> ${esc(dl)}. Стоимость подтвердит продавец</span></li>
-        ${own || l.over ? '' : `<li>${ic('alert')}<span><b>Если выиграете.</b> Оформите заказ за 48 часов, иначе спишется штраф. Ставку отменить нельзя</span></li>`}
+        ${own || l.over ? '' : `<li>${ic('alert')}<span>Если выиграете, оформите заказ за 48 часов, иначе спишется штраф. Ставку отменить нельзя</span></li>`}
       </ul>`;
   }
   function pageLot(r) {
     const a = byAny(r.id) || AUCTIONS[0]; const s = SELLERS[a.seller];
     const others = AUCTIONS.filter((x) => x.id !== a.id).slice(0, 4);
     const tabs = [['desc', 'Описание']].concat((a.specs || []).length ? [['specs', 'Характеристики']] : [], [['talk', 'Обсуждение']]);
-    const body = itemTab(a);
+    // В полном примере Leman Russ первые три строки описания показаны одним абзацем.
+    const details = a.id === 'a-leman' && a.text?.length >= 3
+      ? { ...a, added: a.added || '04.11.2026', text: [a.text.slice(0, 3).join('. '), ...a.text.slice(3)] }
+      : a;
+    const body = itemTab(details);
     return `<div class="wrap page lot-p">
       ${crumbs([HOME_C, CAT_C, { t: a.cat, a: `data-act="nodeq" data-v="${esc(a.cat)}"` }])}
       <div class="pdp">
@@ -1505,18 +1774,18 @@
           <div class="tab-body">${body}</div>
         </div>
       </div>
-      ${others.length ? `<section class="sec"><div class="sec-hd"><h2 class="h2">Другие аукционы</h2></div><div class="scroller">${others.map(acard).join('')}</div></section>` : ''}
+      ${others.length ? `<section class="sec lot-related"><div class="sec-hd"><h2 class="h2">Другие аукционы</h2><a class="row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 14)}</a></div><div class="lot-related-grid">${others.map(acard).join('')}</div></section>` : ''}
     </div>`;
   }
   function lotSticky(a) {
     const l = lotInfo(a);
-    if (l.ls.st === 'won') return `<div class="sticky-bar"><div class="sum"><span class="t12 c3">Вы выиграли</span><b>${fmt(l.ls.my)}</b></div><a class="btn primary lg" href="#/cart">В корзину</a></div>`;
-    if (l.over || isOwnLot(a) || ui.bidArm) return '';
+    if (l.ls.st === 'won') return `<div class="sticky-bar"><div class="sum"><span class="t12 c3">Вы выиграли</span><b>${fmt(l.ls.my)}</b></div><button class="btn primary lg" data-act="wonGo" data-id="${a.id}" data-p="${l.ls.my}">В корзину</button></div>`;
+    if (l.over || isOwnLot(a) || (isAuth() && S.flags.minus) || ui.bidArm) return '';
     return `<div class="sticky-bar"><div class="sum"><span class="t12 c3">${l.bids ? 'Текущая ставка' : 'Стартовая цена'}</span><b>${fmt(l.price)}</b></div><button class="btn primary lg" data-act="bidFocus">Сделать ставку</button></div>`;
   }
 
   /* ---------- ЛК: торги ---------- */
-  const LK_BIDS = [{ id: 'a-leman', st: 'lead', my: 900 }, { id: 'a-guilliman', st: 'outbid', my: 300 }, { id: 'a-redemptor', st: 'wonDemo', my: 650 }, { id: 'a-deathwatch', st: 'lost', my: 400 }];
+  const LK_BIDS = [{ id: 'a-leman', st: 'lead', my: 900 }, { id: 'a-guilliman', st: 'outbid', my: 300 }, { id: 'a-redemptor', st: 'wonDemo', my: 650 }, { id: 'a-deathwatch', st: 'lost', my: 350 }];
   function pageLkBids() {
     const tab = ui.bidTab || 'all'; const res = ui.bidRes || 'all';
     const data = S.flags.noBids ? [] : LK_BIDS.map((b) => { const ls = (S.lot || {})[b.id]; return ls && ls.st ? Object.assign({}, b, { st: ls.st, my: ls.my || b.my, auto: ls.auto }) : b; });
@@ -1526,16 +1795,16 @@
     const TAG = { lead: ['ok', 'Вы лидируете'], outbid: ['act', 'Ставку перебили'], won: ['ok', 'Вы выиграли'], wonDemo: ['ok', 'Вы выиграли'], lost: ['mute', 'Лот у другого участника'], reserve: ['mute', 'Резерв не достигнут'], ended: ['mute', 'Завершён'] };
     const card = (b) => {
       const a = byAny(b.id); const l = lotInfo(a); const t = TAG[b.st] || ['wait', 'Идут торги'];
-      const url = `#/lot/${a.id}${done(b) ? '?ended=1' : ''}`; const need = win(b) && !(S.wonDone || []).includes(b.id);
+      const url = `#/lot/${a.id}${done(b) ? '?ended=1' : '?mine=1'}`; const need = win(b) && !(S.wonDone || []).includes(b.id);
       const cta = b.st === 'outbid' ? `<a class="btn primary" href="${url}">Поставить снова</a>` : need ? `<button class="btn primary" data-act="wonGo" data-id="${a.id}" data-p="${b.my}">Оформить заказ</button>` : `<a class="btn secondary" href="${url}">Открыть лот</a>`;
-      return `<article class="ord card"><header class="ord-hd"><div><h2 class="h3">${esc(a.title)}</h2><p class="t12 c3">${esc(SELLERS[a.seller].name)}</p></div><span class="ost ${t[0]}">${t[1]}</span></header>
+      return `<article class="ord card lk-bid-card"><header class="ord-hd"><div><h2 class="h3">${esc(a.title)}</h2><p class="t12 c3">${esc(SELLERS[a.seller].name)}</p></div><span class="ost ${t[0]}">${t[1]}</span></header>
         <div class="ord-items"><a class="ord-it" href="${url}"><img src="${a.img}" alt=""><span class="bid-rows"><span><span class="c2">Ваша ставка</span> <b>${fmt(b.my)}</b></span><span><span class="c2">${done(b) ? 'Последняя ставка' : 'Текущая'}</span> <b>${fmt(l.price)}</b></span>${b.auto ? `<span><span class="c2">Автоставка</span> <b>${fmt(b.auto)}</b></span>` : ''}${done(b) ? '' : `<span><span class="c2">До конца</span> <b data-end="${l.end}"></b></span>`}${need ? '<span class="ord-need">Оформите заказ за 48 часов</span>' : ''}</span></a></div>
         <div class="ord-ft"><span></span><div class="ord-acts">${cta}</div></div></article>`;
     };
     return lkShell('auctions', `<h1 class="h1" style="margin-bottom:12px">Торги</h1>
-      ${data.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x">${[['all', 'Все'], ['on', 'Активные'], ['off', 'Завершённые']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="bidTab" data-v="${k}">${l}</button>`).join('')}</div>${dd('bidRes', res, [['all', 'Любой итог'], ['win', 'Выигранные'], ['lose', 'Проигранные']], { aria: 'Итог торгов' })}</div>
+      ${data.length ? `<div class="lk-bar"><div class="tabs-seg scroll-x bid-tabs">${[['all', 'Все'], ['on', 'Активные'], ['off', 'Завершённые']].map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="bidTab" data-v="${k}">${l}</button>`).join('')}</div>${dd('bidRes', res, [['all', 'Любой итог'], ['win', 'Выигранные'], ['lose', 'Проигранные']], { aria: 'Итог торгов' })}</div>
       ${list.length ? `<div class="stack-12">${list.map(card).join('')}</div>` : `<div class="empty"><p class="h3">Ничего не найдено</p><p class="c2">Выберите другой фильтр</p></div>`}`
-        : `<div class="empty"><div class="ico">${ic('gavel', 28)}</div><p class="h3">Вы пока не участвовали в торгах</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши ставки и выигранные лоты</p><a class="btn primary" href="#/catalog" data-act="tab" data-v="auc">Смотреть аукционы</a></div>`}`);
+        : `<div class="empty"><div class="ico">${ic('gavel', 28)}</div><p class="h3">Вы пока не участвовали в торгах</p><p class="c2" style="margin:4px 0 16px">Здесь появятся ваши ставки и выигранные лоты</p><a class="btn primary" href="#/catalog" data-act="tab" data-v="auc">К торгам</a></div>`}`);
   }
 
   /* ---------- Слои ---------- */
@@ -1565,6 +1834,7 @@
     const old = ovEl.querySelector('.modal-bd, .drawer-bd'); const top = old ? old.scrollTop : 0;
     let h = '';
     if (ui.drawer) h += drawerHtml();
+    if (ui.modal?.filters) h += filterSheet(ui.modal.filters);
     if (ui.modal && ui.modal.login !== undefined) {
       const stub = 'data-act="soon" data-text="Вход через соцсети это блок первого визита"';
       h += `<div class="scrim" data-act="closeModal"><div class="modal" role="dialog" aria-label="Вход" data-stop><div class="modal-hd"><span class="h3">Вход</span><button class="icon-btn" data-act="closeModal" aria-label="Закрыть">${ic('x')}</button></div>
@@ -1581,6 +1851,12 @@
         <a class="prof-i" href="#/lk/orders" data-act="closeModal">Покупки</a><a class="prof-i" href="#/lk/auctions" data-act="closeModal"><span>Торги</span>${wonNeed() ? `<span class="badge-i">${wonNeed()}</span>` : ''}</a>${li('Продажи', 'Продажи это блок продажи')}${li('Товары', 'Товары это блок продажи')}${li('Баланс', 'Баланс и пополнение комиссии это блок продажи')}${li('Настройки', 'Поля ЛК это блок первого визита')}
         <button class="prof-i" data-act="logout">Выход</button>
       </nav></div>`;
+    }
+    if (ui.modal?.checkoutError) {
+      h += `<div class="scrim" data-act="fixCheckout"><div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="checkoutErrorTitle" aria-describedby="checkoutErrorText" data-stop>
+        <div class="modal-hd"><h2 class="h3" id="checkoutErrorTitle">Проверьте заказ</h2></div>
+        <div class="modal-bd" id="checkoutErrorText">${esc(ui.modal.message)}</div>
+        <div class="modal-ft"><button class="btn primary" data-act="fixCheckout">Исправить</button></div></div></div>`;
     }
     h += lkModals();
     if (ui.modal && ui.modal.report) {
@@ -1604,6 +1880,7 @@
     typo(ovEl);
     const nw = ovEl.querySelector('.modal-bd, .drawer-bd'); if (nw) nw.scrollTop = top;
     document.body.classList.toggle('lock', !!(ui.drawer || ui.modal || ui.lb !== null));
+    appEl.inert = !!ui.modal?.filters;
   }
   function toast(text, href, label, act) {
     ui.toast = { text, href, label, act }; overlay();
@@ -1707,25 +1984,66 @@
   });
 
   /* ---------- События ---------- */
-  function setNode(v) { S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
+  function setNode(v) {
+    if (navigationSections.has(v)) {
+      ui.menu = false; ui.drawer = false; render();
+      toast('Это отдельный раздел сайта');
+      return;
+    }
+    S.cat.node = v || null; S.cat.grp = null; S.cat.q = ''; ui.menu = false; ui.drawer = false; ui.dr = []; save(); go('#/catalog'); }
+  function saveRecipient() {
+    if (!ui.recipientDraft) return true;
+    contactKeys.forEach(k => { ui.touched[k] = true; });
+    const invalid = contactKeys.find(fieldError);
+    if (invalid) {
+      render(); document.querySelector(`[name="${invalid}"]`)?.focus(); return false;
+    }
+    Object.assign(S.form, ui.recipientDraft); ui.recipientDraft = null; save();
+    return true;
+  }
   const A = {
+    fixCheckout() {
+      const field = document.querySelector(ui.modal.checkoutError);
+      ui.modal = null; overlay(); field?.scrollIntoView({ block: 'center' });
+      field?.querySelector('input, button')?.focus({ preventScroll: true });
+    },
+    recipientEdit() {
+      ui.recipientDraft = Object.fromEntries(contactKeys.map(k => [k, S.form[k]]));
+      render(); document.querySelector('[name="fio"]').focus();
+    },
+    recipientSave() { if (saveRecipient()) { render(); document.querySelector('[data-act="recipientEdit"]').focus(); } },
+    recipientCancel() { ui.recipientDraft = null; render(); document.querySelector('[data-act="recipientEdit"]').focus(); },
     menu() { if (window.innerWidth < 1024) { ui.drawer = true; ui.dr = []; overlay(); return; } ui.menu = !ui.menu; render(); },
     drawer() { ui.drawer = !ui.drawer; ui.dr = []; overlay(); },
     dr(el, ev) { ev.preventDefault(); ui.dr = ui.dr.concat(ui.dr.length ? el.dataset.v : +el.dataset.v); overlay(); },
     drBack() { ui.dr = ui.dr.slice(0, -1); overlay(); },
-    mmMore(el) { ui.mmMore[el.dataset.k] = !ui.mmMore[el.dataset.k]; if (ui.drawer) overlay(); else if (ui.menu) repaintMenu(); else render(); },
+    mmMore(el) { ui.mmMore[el.dataset.k] = !ui.mmMore[el.dataset.k]; if (ui.drawer || ui.modal?.filters) overlay(); else if (ui.menu) repaintMenu(); else render(); },
     node(el, ev) { ev.preventDefault(); setNode(el.dataset.v || el.dataset.top); },
-    nodef(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.v || null; S.cat.grp = null; save(); render(); },
-    nodeg(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.top; S.cat.grp = el.dataset.v; save(); render(); },
+    nodef(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.v || null; S.cat.grp = null; save(); if (ui.modal?.filters) overlay(); else render(); },
+    nodeg(el, ev) { ev.preventDefault(); S.cat.node = el.dataset.top; S.cat.grp = el.dataset.v; save(); if (ui.modal?.filters) overlay(); else render(); },
     nodeq(el, ev) { ev.preventDefault(); closeSearch(); setNode(el.dataset.v); },
+    filters() { openFilters('all'); },
+    closeFilters() {
+      ui.modal = null; render();
+      appEl.querySelector('[data-act="filters"]')?.focus({ preventScroll: true });
+    },
+    fltT(el) {
+      const k = el.dataset.k;
+      mobileFilterSections[k] = !mobileFilterOpen(k);
+      overlay();
+      ovEl.querySelector(`[data-act="fltT"][data-k="${k}"]`)?.focus({ preventScroll: true });
+    },
     fEdit(el) {
       const a = activeFilters()[+el.dataset.i];
+      if (!a || a.k === 'q') return;
       const k = a.k === 'f' ? a.g : a.k === 'node' ? 'cat' : ['city', 'country'].includes(a.k) ? 'geo' : a.k;
-      document.querySelector(`[data-filter-group="${k}"]`)?.scrollIntoView({ block: 'nearest' });
+      if (catalogDesktop.matches) appEl.querySelector(`[data-filter-group="${k}"]`)?.scrollIntoView({ block: 'nearest' });
+      else openFilters(k);
     },
     toLk() { go(S.orders && S.orders.length === 1 ? `#/lk/order/${S.orders[0].no}` : '#/lk/orders'); },
     contactSave() { toast('Контакт сохранён, его увидит продавец заказа'); },
     safePay() { lkPatch(ui.modal.pay, { st: 'paid', left: 120 }); ui.modal = null; render(); toast('Заказ оплачен, деньги у сервиса'); },
+    lkReset() { ui.lkQ = ''; ui.lkF = {}; ui.lkTab = 'all'; render(); document.getElementById('lkQ')?.focus(); },
     lkTab(el) { ui.lkTab = el.dataset.v; render(); },
     payOpen(el) { ui.rc = null; ui.modal = { pay: +el.dataset.no }; overlay(); },
     rcClear() { ui.rc = null; overlay(); },
@@ -1769,7 +2087,7 @@
       if (v < l.next) ui.bidErr = `Ставка должна быть не меньше ${fmt(l.next)}`;
       else if (v > MAX_BET) ui.bidErr = `Ставка должна быть не больше ${fmt(MAX_BET)}`;
       if (ui.bidErr) { render(); return; }
-      if (S.flags.noEmail) { ui.mailSent = false; ui.mailErr = ''; ui.modal = { mail: v }; overlay(); return; }
+      if (S.flags.noEmail) { ui.mailSent = false; ui.mailErr = ''; ui.mailValue = ''; ui.modal = { mail: v }; overlay(); return; }
       ui.bidArm = v; render(); const c = document.getElementById('bidOk'); if (c) c.focus();
     },
     bidDo() {
@@ -1787,7 +2105,7 @@
     mailSend() { ui.mailSent = true; overlay(); },
     mailDo() {
       const v = (document.getElementById('mailCode').value || '').trim();
-      if (v !== '1234') { ui.mailErr = 'Неверный код'; overlay(); return; }
+      if (v !== '1234') { ui.mailValue = v; ui.mailErr = 'Неверный код'; overlay(); return; }
       const amt = ui.modal.mail; S.flags.noEmail = false; ui.mailErr = ''; ui.modal = null; ui.bidArm = amt; save(); render(); toast('Почта подтверждена');
     },
     wonGo(el) { winLot(el.dataset.id, +el.dataset.p); save(); go('#/cart'); },
@@ -1817,12 +2135,10 @@
       list[i].replies = (list[i].replies || []).concat({ who: myName(), seller: isOwn(byAny(id)), date: 'Только что', text: v });
       S.comments[id] = list; ui.replyTo = null; save(); render();
     },
-    certT() { ui.certOpen = !ui.certOpen; ui.certErr = ''; render(); },
-    certGo() { const v = (document.getElementById('cert').value || '').trim().toUpperCase(); if (v === 'GIFT500') { S.co.cert = v; ui.certErr = ''; ui.certOpen = false; } else ui.certErr = v ? 'Сертификат не найден' : 'Введите код сертификата'; save(); render(); },
     addrOn(el) { S.co.addr = S.co.addr || {}; S.co.addr[el.dataset.s] = {}; save(); render(); },
     addrOff(el) { delete S.co.addr[el.dataset.s]; save(); render(); },
-    certOff() { delete S.co.cert; save(); render(); },
     coNext() {
+      if (!saveRecipient()) return;
       const bad = stepError(ui.coStep);
       if (bad) { ui.submitted = true; render(); const e = document.querySelector(bad); if (e) { e.scrollIntoView({ block: 'center' }); } return; }
       ui.submitted = false; ui.coStep += 1; render(); window.scrollTo(0, 0);
@@ -1836,7 +2152,7 @@
     tagq(el) { toast(`Выдача по тегу ${el.dataset.v}: одинаковые теги объединяем`); },
     viewedT() { ui.viewedMore = !ui.viewedMore; render(); },
     homePop() { S.cat = Object.assign(DEFCAT(), { sort: 'pop' }); save(); go('#/catalog'); },
-    resetCat() { S.cat = DEFCAT(); save(); render(); },
+    resetCat() { S.cat = DEFCAT(); save(); if (ui.modal?.filters) overlay(); else render(); },
     dropF(el) {
       const a = activeFilters()[+el.dataset.i]; const c = S.cat;
       if (a.k === 'node') c.node = null; if (a.k === 'q') c.q = ''; if (a.k === 'price') { c.min = ''; c.max = ''; } if (a.k === 'city') c.city = 'Все'; if (a.k === 'country') c.country = 'Все';
@@ -1845,7 +2161,11 @@
     },
     fltApply() { ui.applied = null; ui.fTip = null; render(); },
     searchClear(el) { const f = el.closest('form'); const had = !!S.cat.q; f.q.value = ''; f.classList.remove('dirty'); S.cat.q = ''; save(); if (had && route().name === 'catalog') render(); const n = [...document.querySelectorAll('input[name=q]')].find((i) => i.offsetParent); if (n) n.focus(); },
-    saveSearch() { if (isAuth()) { render(); toast('Поиск сохранён: он появится в избранном'); return; } ui.modal = { login: 'Войдите, чтобы сохранить поиск: он появится в избранном, а новые объявления по нему придут в уведомления' }; overlay(); },
+    saveSearch() {
+      if (isAuth()) { ui.modal = null; render(); toast('Поиск сохранён: он появится в избранном'); return; }
+      ui.modal = { login: 'Войдите, чтобы сохранить поиск: он появится в избранном, а новые объявления по нему придут в уведомления' };
+      render();
+    },
     fav(el, ev) { ev.preventDefault(); if (!isAuth()) { ui.modal = { login: 'Войдите, чтобы сохранять товары в избранное' }; overlay(); return; } const id = el.dataset.id; const i = S.favs.indexOf(id); if (i >= 0) S.favs.splice(i, 1); else S.favs.push(id); save(); render(); },
     homeTab(el) { ui.homeTab = el.dataset.v; render(); },
     foot(el) { ui.footOpen[el.dataset.k] = !ui.footOpen[el.dataset.k]; render(); },
@@ -1878,16 +2198,18 @@
     },
     rmOff() { if (!S.cart.some((c) => c.on)) { toast('Отметьте товары, которые хотите удалить'); return; } ui.undo = S.cart.slice(); S.cart = S.cart.filter((c) => !c.on); if (!S.cart.some(isOut)) S.notice = null; save(); render(); toast('Товары убраны из корзины', null, 'Отменить', 'undoRm'); },
     open(el) { ui.opened[el.dataset.k] = true; render(); },
-    close(el) { const k = el.dataset.k; ui.opened[k] = false; if (k[0] === 'c') delete S.co.comment[el.dataset.s]; ui.promoErr[el.dataset.s] = ''; save(); render(); },
+    close(el) { const k = el.dataset.k; ui.opened[k] = false; if (k[0] === 'c') delete S.co.comment[el.dataset.s]; save(); render(); },
     city(el) { S.co.city = S.co.cityTxt = el.dataset.v; ui.cityOpen = false; resetBadDl(); save(); render(); },
     pvz(el, ev) { ev.preventDefault(); ui.modal = { pvz: el.dataset.s }; overlay(); },
     pvzPick(el) { S.co.pvz[el.dataset.s] = el.dataset.v; ui.modal = null; save(); render(); },
-    promo(el) {
-      const sid = el.dataset.s; const v = (document.getElementById('promo-' + sid).value || '').trim().toUpperCase();
-      if (v === 'MINI10') { S.co.promo[sid] = v; ui.promoErr[sid] = ''; } else ui.promoErr[sid] = v ? 'Промокод не найден' : 'Введите промокод';
-      save(); render();
+    chooseCodeSeller(el) { applyDiscount(el.dataset.s); },
+    removeCode(el) {
+      const { code, s } = el.dataset;
+      if (s) S.co.promo[s] = S.co.promo[s].filter(c => c !== code);
+      else S.co.certificates = S.co.certificates.filter(c => c !== code);
+      resetCodeEntry(); ui.codeStatus = `Код ${code} удалён`; save(); render();
+      document.getElementById('discountCode').focus({ preventScroll: true });
     },
-    promoOff(el) { delete S.co.promo[el.dataset.s]; ui.opened['p' + el.dataset.s] = false; save(); render(); },
     term(el) { S.cat.q = el.dataset.v; S.cat.node = null; closeSearch(); save(); go('#/catalog'); },
     searchAll() { const f = [...document.querySelectorAll('[data-form=search]')].find((x) => x.offsetParent); S.cat.q = f.q.value.trim(); S.cat.node = null; closeSearch(); save(); go('#/catalog'); },
     submit() { if (!ui.loading) submit(); },
@@ -1901,7 +2223,7 @@
     const tog = t.closest('[data-dd-toggle]');
     if (tog) { const m = tog.parentNode.querySelector('.dd-menu'); const was = m.hidden; closeDD(); m.hidden = !was; tog.setAttribute('aria-expanded', String(was)); if (was) { const s = m.querySelector('[data-dd-search]'); if (s) s.focus(); } return; }
     const opt = t.closest('[data-dd-val]');
-    if (opt) { const id = opt.closest('[data-dd]').dataset.dd; DD[id](opt.dataset.ddVal); save(); closeDD(); if (ui.drawer) overlay(); else render(); return; }
+    if (opt) { const id = opt.closest('[data-dd]').dataset.dd; DD[id](opt.dataset.ddVal); save(); closeDD(); if (ui.drawer || ui.modal?.filters) overlay(); else render(); return; }
     if (t.closest('[data-dd-search]')) return;
     closeDD();
     const el = t.closest('[data-act]');
@@ -1939,12 +2261,28 @@
     if (t.dataset.actChg === 'all') { S.cart.forEach((c) => { c.on = t.checked; }); save(); render(); return; }
     if (t.name === 'dlNew') { ui.dlNew = t.value; overlay(); return; }
     if (t.dataset.actChg === 'dl') { S.co.dl[t.dataset.s] = t.value; save(); render(); return; }
-    if (t.dataset.actChg === 'pay') { S.co.pay[t.dataset.s] = t.value; save(); render(); return; }
-    if (t.dataset.actChg === 'flt') {
-      const g = t.dataset.g; pend(`.cat-side input[data-g="${g}"][value="${t.value.replace(/"/g, '\\"')}"]`); const cur = S.cat.f[g] || []; S.cat.f[g] = t.checked ? cur.concat(t.value) : cur.filter((x) => x !== t.value);
+    if (t.dataset.actChg === 'safe') {
+      S.co.safe[t.dataset.s] = t.checked;
+      save(); render();
+      document.querySelector(`[data-act-chg="safe"][data-s="${t.dataset.s}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if (t.dataset.actChg === 'pay') {
+      S.co.pay[t.dataset.s] = t.value;
+      if (t.value === 'cash') S.co.safe[t.dataset.s] = false;
       save(); render(); return;
     }
-    if (t.dataset.cat) { pend(`.cat-side [data-cat=${t.dataset.cat}]`); S.cat[t.dataset.cat] = t.value.replace(/\D/g, ''); save(); render(); }
+    if (t.dataset.actChg === 'flt') {
+      const g = t.dataset.g; pend(`.cat-side input[data-g="${g}"][value="${t.value.replace(/"/g, '\\"')}"]`); const cur = S.cat.f[g] || []; S.cat.f[g] = t.checked ? cur.concat(t.value) : cur.filter((x) => x !== t.value);
+      save();
+      if (ui.modal?.filters) {
+        overlay();
+        const replacement = ovEl.querySelector(`input[data-g="${g}"][value="${CSS.escape(t.value)}"]`);
+        replacement?.focus({ preventScroll: true });
+      } else render();
+      return;
+    }
+    if (t.dataset.cat && !ui.modal?.filters) { pend(`.cat-side [data-cat=${t.dataset.cat}]`); S.cat[t.dataset.cat] = t.value.replace(/\D/g, ''); save(); render(); }
   });
   const phoneMask = (v) => {
     let d = v.replace(/\D/g, ''); if (d[0] === '8') d = '7' + d.slice(1); if (d && d[0] !== '7') d = '7' + d; d = d.slice(0, 11);
@@ -1956,12 +2294,27 @@
   function refreshField(n, input) {
     const box = input.closest('.fld'); const err = showErr(n); const f = FIELD[n];
     box.classList.toggle('err', !!err);
+    input.setAttribute('aria-invalid', String(!!err));
     const old = box.querySelector('.err-t, .hint'); if (old) old.remove();
     if (err) box.insertAdjacentHTML('beforeend', `<span class="err-t">${err}</span>`); else if (f.hint) box.insertAdjacentHTML('beforeend', `<span class="hint">${f.hint}</span>`);
     typo(box);
   }
   document.addEventListener('input', (ev) => {
     const t = ev.target;
+    if (ui.modal?.filters && t.dataset.cat) {
+      t.value = t.value.replace(/\D/g, '');
+      S.cat[t.dataset.cat] = t.value;
+      save();
+      ovEl.querySelector('#filterResults').textContent = showFilterResults();
+      return;
+    }
+    if (t.id === 'discountCode') {
+      ui.codeDraft = t.value; ui.chooseSeller = false; ui.codeStatus = ''; ui.codeError = '';
+      t.closest('form').classList.remove('err'); t.setAttribute('aria-invalid', 'false');
+      document.getElementById('discountFeedback').textContent = '';
+      document.querySelector('.discount-sellers')?.remove();
+      return;
+    }
     if (t.dataset.ddSearch !== undefined) {
       const v = t.value.toLowerCase();
       t.closest('.dd-menu').querySelectorAll('.dd-o').forEach((o) => { o.hidden = !o.textContent.toLowerCase().includes(v); });
@@ -1972,11 +2325,25 @@
       S.co.cityTxt = t.value; S.co.city = ''; ui.cityOpen = true;
       document.getElementById('cityList').innerHTML = cityList(t.value); return;
     }
-    if (t.dataset.addr) { S.co.addr[t.dataset.addr][t.dataset.k] = t.value; save(); return; }
+    if (t.dataset.addr) {
+      const {addr, k} = t.dataset;
+      S.co.addr[addr][k] = t.value;
+      if (ui.submitted) {
+        const err = ownAddressError(addr, k);
+        const box = t.closest('.fld');
+        box.classList.toggle('err', !!err);
+        t.setAttribute('aria-invalid', String(!!err));
+        const hint = box.querySelector('.err-t');
+        hint.hidden = !err;
+        hint.textContent = err;
+      }
+      save(); return;
+    }
     if (t.dataset.coComment) { S.co.comment[t.dataset.coComment] = t.value; save(); return; }
     if (t.name && FIELD[t.name]) {
       if (t.name === 'phone') t.value = phoneMask(t.value);
-      S.form[t.name] = t.value; save();
+      if (ui.recipientDraft && contactKeys.includes(t.name)) ui.recipientDraft[t.name] = t.value;
+      else { S.form[t.name] = t.value; save(); }
       if (ui.touched[t.name] || ui.submitted) refreshField(t.name, t);
     }
   });
@@ -1985,18 +2352,29 @@
   document.addEventListener('focusin', (ev) => {
     const t = ev.target;
     if (t.id === 'city') { ui.cityOpen = true; document.getElementById('cityList').innerHTML = cityList(t.value); }
-    if (t.name === 'q' && t.closest('[data-form=search]')) { t.placeholder = ' '; openSearch(t.closest('form'), false); }
+    if (t.name === 'q' && t.closest('[data-form=search]')) {
+      t.form.classList.add('editing');
+      t.placeholder = ' ';
+      openSearch(t.form, false);
+    }
   });
   document.addEventListener('focusout', (ev) => {
     const t = ev.target;
+    const search = t.closest('[data-form=search]');
+    if (search && !search.contains(ev.relatedTarget)) search.classList.remove('editing');
+    if (search && t.name === 'q') t.placeholder = searchExamples[0];
     if (t.name && FIELD[t.name]) { ui.touched[t.name] = true; refreshField(t.name, t); }
     if (t.id === 'city') ui.touched.city = true;
   });
   document.addEventListener('submit', (ev) => {
-    const f = ev.target; if (f.dataset.form !== 'search') return;
+    const f = ev.target;
+    if (f.dataset.form === 'discount') { ev.preventDefault(); applyDiscount(); return; }
+    if (f.dataset.form !== 'search') return;
     ev.preventDefault(); S.cat.q = f.q.value.trim(); S.cat.node = null; closeSearch(); save(); go('#/catalog');
   });
   document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && ui.modal?.checkoutError) { A.fixCheckout(); return; }
+    if (ev.key === 'Escape' && ui.modal?.filters) { A.closeFilters(); return; }
     if (ev.key === 'Escape') { closeDD(); closeSearch(); ui.modal = null; ui.drawer = false; ui.lb = null; if (ui.menu) { ui.menu = false; render(); } else overlay(); }
   });
   document.addEventListener('error', (ev) => {
@@ -2010,20 +2388,27 @@
   window.addEventListener('scroll', placeTip, { passive: true });
   document.addEventListener('scroll', placeTip, { passive: true, capture: true });
   window.addEventListener('hashchange', () => {
+    if (ui.modal?.filters) ui.modal = null;
     ui.applied = null; ui.fTip = null; ui.bidArm = null; ui.bidV = undefined; ui.bidErr = ''; ui.menu = false; ui.drawer = false; ui.toast = null; ui.photo = 0; ui.tab = 'desc'; ui.descOpen = false; ui.qty = 1; ui.lb = null; ui.crumbs = false; ui.revSort = 'new';
+    ui.okAnim = null;
     if (route().name === 'checkout') { S.notice = null; ui.coStep = 1; }
     window.scrollTo(0, 0); render();
+  });
+  catalogDesktop.addEventListener('change', () => {
+    if (ui.modal?.filters) A.closeFilters();
+    else if (ui.applied) A.fltApply();
   });
 
   /* Команды панели проверки */
   window.addEventListener('message', (ev) => {
     const m = ev.data || {};
     if (m.type === 'mfm-go') {
+      if (m.hash === '#/success') ui.okAnim = null;
       if (m.hash === '#/checkout' && !S.cart.length) preset('one');
       go(m.hash);
     }
     if (m.type === 'mfm-preset') {
-      if (m.name === 'cash') { preset('one'); fillForm(); ui.submitted = false; groups(true).forEach((g) => { S.co.city = S.co.cityTxt = g.seller.city; S.co.dl[g.sid] = 'pickup'; S.co.pay[g.sid] = 'cash'; }); } else preset(m.name);
+      preset(m.name);
       save(); render();
     }
     if (m.type === 'mfm-flag') {
@@ -2048,8 +2433,8 @@
       overlay();
     }
     if (m.type === 'mfm-fill') { if (!S.cart.length) preset('one'); fillForm(); ui.submitted = false; save(); render(); }
-    if (m.type === 'mfm-empty-submit') { S.form = {}; S.co = DEF().co; save(); render(); setTimeout(submit, 0); }
-    if (m.type === 'mfm-reset') { S = DEF(); save(); Object.assign(ui, { submitted: false, touched: {}, opened: {} }); go('#/'); render(); }
+    if (m.type === 'mfm-empty-submit') { resetCodeEntry(); S.form = {}; S.co = DEF().co; save(); render(); setTimeout(submit, 0); }
+    if (m.type === 'mfm-reset') { resetCodeEntry(); S = DEF(); save(); Object.assign(ui, { submitted: false, touched: {}, opened: {}, recipientDraft: null }); go('#/'); render(); }
   });
 
 

@@ -42,7 +42,7 @@ svg.i.fill { fill: currentColor; stroke: none; }
 .sb { font-weight: 600; }
 .c2 { color: var(--text-2); } .c3 { color: var(--text-3); }
 .link { color: var(--text-info); }
-.link:hover { text-decoration: underline; }
+.link:hover { color: var(--brand); }
 .row { display: flex; align-items: center; gap: 8px; }
 .between { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .stack-4 > * + * { margin-top: 4px; } .stack-8 > * + * { margin-top: 8px; } .stack-12 > * + * { margin-top: 12px; } .stack-16 > * + * { margin-top: 16px; } .stack-24 > * + * { margin-top: 24px; }
@@ -766,9 +766,9 @@ body.has-sticky .ftr-end { padding-bottom: 76px; }
 
 /* ===== Вторая партия правок ===== */
 /* Ссылки в стиле сайта, без синего */
-.link { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.link { color: var(--text-2); text-decoration: none; }
 .link:hover { color: var(--brand); }
-.linkbtn { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.linkbtn { color: var(--text); text-decoration: none; }
 .linkbtn:hover { color: var(--brand); }
 .mm-more, .dl-m { color: var(--text); }
 

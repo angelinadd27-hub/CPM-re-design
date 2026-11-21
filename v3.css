@@ -288,15 +288,17 @@
 .promo-t .btn { margin-top: 8px; max-width: 100%; white-space: normal; text-align: center; }
 .promo-f { display: block; justify-self: center; width: min(106.25%, 500px); max-width: none; height: auto; aspect-ratio: 374 / 210; object-fit: cover; margin-top: 70px; transform: translateX(6px); }
 @media (min-width: 768px) {
-  .promo { align-items: center; min-height: clamp(300px, 26.4vw, 380px); padding-top: 12px; }
-  .promo-t { width: min(460px, calc(41% - 48px)); margin: 0 0 0 48px; }
-  .promo-t h2 { font-size: 24px; line-height: 32px; }
-  .promo-t p { font-weight: 600; }
-  .promo-f { position: absolute; right: -1.02%; bottom: -48px; width: 60.16%; aspect-ratio: 770 / 433; margin: 0; transform: none; }
+  .promo-t h2 { font-size: 32px; line-height: 40px; }
+  .promo-t p { font-size: 20px; line-height: 28px; font-weight: 600; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .promo-t { max-width: 460px; margin: 48px 48px 0; }
+  .promo-f { justify-self: end; width: min(calc(100% - 48px), 720px); aspect-ratio: 16 / 9; margin: 0; transform: translate(39px, 18px); }
 }
 @media (min-width: 1024px) {
-  .promo-t h2 { font-size: 32px; line-height: 40px; }
-  .promo-t p { font-size: 20px; line-height: 28px; }
+  .promo { align-items: center; min-height: clamp(300px, 26.4vw, 380px); padding-top: 12px; }
+  .promo-t { width: min(460px, calc(41% - 48px)); margin: 0 0 0 48px; }
+  .promo-f { position: absolute; right: -1.02%; bottom: -48px; width: 60.16%; aspect-ratio: 770 / 433; margin: 0; transform: none; }
 }
 
 /* Карточка в выдаче */

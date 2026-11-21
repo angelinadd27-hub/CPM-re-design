@@ -329,7 +329,6 @@ body.has-sticky { --sticky-h: 64px; }
 .two { display: grid; gap: 16px; align-items: start; }
 @media (min-width: 1024px) { .two { grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; } .two-side { position: sticky; top: 88px; } }
 @media (min-width: 1280px) { .two { grid-template-columns: minmax(0, 1fr) 400px; } }
-.focus-page .two-side { top: 72px; }
 .sg { background: var(--surface); border-radius: var(--r-lg); border: 1px solid var(--border-subtle); }
 .sg + .sg { margin-top: 12px; }
 .sg-hd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
@@ -491,7 +490,8 @@ body.lock { overflow: hidden; }
 .hdr-focus { height: 56px; }
 .m-search { padding: 8px 0; }
 @media (min-width: 1024px) {
-  .hdr-row { height: 84px; gap: 20px; }
+  :root { --desktop-header-row-height: 84px; }
+  .hdr-row { height: var(--desktop-header-row-height); gap: 20px; }
   .brand { padding: 8px; }
   .brand .logo img { height: 40px; }
   .brand-cat { height: 44px; padding: 0 16px; font-size: 16px; line-height: 24px; }
@@ -729,7 +729,10 @@ body.has-sticky .ftr-end { padding-bottom: 76px; }
 
 /* Оформление: уже и цена рядом с названием */
 .two.co { justify-content: center; }
-@media (min-width: 1024px) { .two.co { grid-template-columns: minmax(0, 700px) 360px; } }
+@media (min-width: 1024px) {
+  .two.co { grid-template-columns: minmax(0, 700px) 360px; }
+  .two.co .two-side { top: calc(var(--desktop-header-row-height) + 1px + 12px); }
+}
 @media (min-width: 1280px) { .two.co { grid-template-columns: minmax(0, 720px) 380px; } }
 .co-wrap { max-width: 1124px; margin: 0 auto; }
 .opt .pr { display: block; font-weight: 600; margin: 2px 0; }

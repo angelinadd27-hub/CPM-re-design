@@ -93,7 +93,7 @@
     cart: [], favs: [], viewed: [], lang: 'RUS', cur: 'RUB',
     form: {}, co: { city: '', cityTxt: '', dl: {}, pay: {}, pvz: {}, comment: {}, promo: {} },
     flags: { emailExists: false, autoConfirm: false, fail: 'none', itemOut: false, partial: false, minSum: false, soldOut: false, role: 'guest' },
-    comments: {}, vars: {},
+    comments: {},
     cat: DEFCAT(), orders: null, banner: null, notice: null,
   });
   let S = DEF();
@@ -103,14 +103,10 @@
   const ui = { menu: false, l1: 0, l2: null, mmMore: {}, drawer: false, dr: [], modal: null, photo: 0, tab: 'desc', descOpen: false, lb: null, toast: null, opened: {}, cityOpen: false, touched: {}, submitted: false, loading: false, qty: 1, promoErr: {}, tagsOpen: false, relOff: {}, homeTab: 'Все', footOpen: {}, clamp: {}, crumbs: false, revSort: 'new', coStep: 1, certOpen: false, certErr: '' };
   let toastT = null;
 
-  /* ---------- Варианты: места сомнений из обсуждений, переключаются в панели ---------- */
-  const VDEF = { adv: 'direct', cats: 'two', city: 'on', plaques: 'off', stock: 'num', sellerBox: 'short', recs: 'on', safe: 'cart', timer: 'price', filters: 'btn', how: 'on', sellerGoods: '2', clubs: '3', logic: 'now' };
-  const V = (k) => (S.vars || {})[k] || VDEF[k];
-
   /* ---------- Безопасная сделка: комиссия примерная ---------- */
   PAYWAY.safe = { title: 'Безопасная сделка', note: 'Деньги у нас, пока вы не получите заказ. Комиссия 5%', icon: 'shield' };
   const SAFE_FEE = 0.05;
-  const sellerSafe = (s) => !!(s.safe || s.pro) && V('safe') !== 'off';
+  const sellerSafe = (s) => !!(s.safe || s.pro);
   const safeFee = (sum) => Math.ceil(sum * SAFE_FEE);
 
   /* ---------- Роли: вход и отношение к лоту. Роль определяется по лоту, а не по аккаунту ---------- */
@@ -359,7 +355,7 @@
   /* ---------- Карточки в списках ---------- */
   const cardList = (id) => { const o = byAny(id); return (o.photos && o.photos.length ? [o.img].concat(o.photos.slice(1)) : [o.img]).slice(0, 5); };
   const swap = (o) => { const n = cardList(o.id).length; return { attr: n > 1 ? `data-swap="${o.id}"` : '', dots: n > 1 ? `<span class="pc-dots">${Array.from({ length: n }, (_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</span>` : '' }; };
-  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}${V('city') === 'on' ? `<span class="pc-city">, г. ${esc(s.city)}</span>` : ''}</span>`;
+  const sellerName = (s) => `<span class="pc-sn">${esc(s.name)}<span class="pc-city">, г. ${esc(s.city)}</span></span>`;
   const revCount = (n) => `<span class="pc-rev" aria-label="${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}">${ic('chat', 14)}<span>${n} ${plural(n, 'отзыв', 'отзыва', 'отзывов')}</span></span>`;
   const sellerRate = (s) => (s.reviews ? `<span class="pc-rate">${STAR}<b>${s.rating.toFixed(2)}</b>${revCount(s.reviews)}</span>` : '<span class="pc-rate"><span>Новый продавец</span></span>');
   const badgeList = (it) => { const v = SELLERS[it.seller]; const b = []; if (v.freeFrom) b.push({ k: 'free', i: 'truck', t: `Бесплатная доставка от ${fmt(v.freeFrom)}`, s: `0 ₽ от ${fmt(v.freeFrom)}` }); if (sellerSafe(v)) b.push({ k: 'safe', i: 'shield', t: 'Безопасная сделка', s: 'Безопасная сделка' }); return b; };
@@ -373,7 +369,6 @@
     return `<article class="pc">
       <div class="pc-media" ${g.attr}>
         <a href="#/item/${it.id}" class="pc-img"><img loading="lazy" src="${it.img}" alt="${esc(it.title)}"></a>
-        ${V('plaques') === 'on' && badgeList(it).length ? `<span class="pc-plaques">${badgeList(it).map(bdgTag).join('')}</span>` : ''}
         ${g.dots}
       </div>
       <div class="pc-body">
@@ -439,16 +434,20 @@
   function pageHome() {
     const hits = { Все: ['strudd', 'darkshroud', 'prisoners', 'yucatan', 'trukk', 'zeratul', 'skorpekh', 'brutalis'], Варгеймы: ['trukk', 'zeratul', 'warriors', 'skorpekh', 'lutazy', 'terminators', 'brutalis', 'darkshroud'], 'Ролевые игры': ['strudd', 'assassins', 'prisoners'], 'Настольные игры': ['yucatan', 'arkham', 'zombicide'] };
     const popular = ITEMS.filter((i) => !hits['Все'].includes(i.id)).slice(0, 4);
-    const more = V('sellerGoods') === '4';
-    const sellers = [['pocket', more ? ['strudd', 'assassins', 'prisoners', 'strudd'] : ['strudd', 'assassins']], ['lexx', more ? ['a-redemptor', 'a-deathwatch', 'a-guilliman', 'a-redemptor'] : ['a-redemptor', 'a-deathwatch']], ['krsk', more ? ['arkham', 'zombicide', 'arkham', 'zombicide'] : ['arkham', 'zombicide']], ['wolf', more ? ['terminators', 'brutalis', 'terminators', 'brutalis'] : ['terminators', 'brutalis']]];
-    const events = HOME.events.slice(0, +V('clubs'));
-    const clubs = HOME.clubs.slice(0, +V('clubs'));
+    const sellers = [
+      ['pocket', ['strudd', 'assassins']],
+      ['lexx', ['a-redemptor', 'a-deathwatch']],
+      ['krsk', ['arkham', 'zombicide']],
+      ['wolf', ['terminators', 'brutalis']],
+    ];
+    const events = HOME.events.slice(0, 3);
+    const clubs = HOME.clubs.slice(0, 3);
     const soon = (t) => `data-act="soon" data-text="${t}"`;
     return `<h1 class="vh">Свободный Рынок Миниатюр: маркет миниатюр, настольных и карточных игр</h1>
       <section class="adv"><div class="wrap adv-in">
         <div class="adv-i">${ic('shield', 24)}<span><b>Работаем с 2018 года</b><span>маркет сообщества</span></span></div>
         <div class="adv-i">${ic('user', 24)}<span><b>60\u00a0000+ человек в месяц</b><span>покупают и продают на СРМ</span></span></div>
-        <div class="adv-i hide-m-only">${V('adv') === 'safe' ? `${ic('shield', 24)}<span><b>Безопасная сделка</b><span>деньги у нас, пока не получите заказ</span></span>` : `${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span>`}</div>
+        <div class="adv-i hide-m-only">${ic('card', 24)}<span><b>Оплата напрямую продавцу</b><span>после подтверждения заказа</span></span></div>
       </div></section>
       <section class="band first"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Текущие аукционы</h2><a class="link row-l" href="#/catalog" data-act="tab" data-v="auc">Посмотреть все ${ic('right', 14)}</a></div>
@@ -456,7 +455,7 @@
       </div></section>
       <section class="band white"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Популярные категории</h2><a class="link row-l" href="#/catalog" data-act="node" data-top="" data-v="">Все категории ${ic('right', 14)}</a></div>
-        <div class="tiles ${V('cats') === 'one' ? 'one' : ''}">${HOME.cats.map((c) => `<a class="tile" href="#/catalog" data-act="nodeq" data-v="${esc(c.t)}"><img loading="lazy" src="${c.img}" alt=""><span>${esc(c.t)}</span></a>`).join('')}</div>
+        <div class="tiles">${HOME.cats.map((c) => `<a class="tile" href="#/catalog" data-act="nodeq" data-v="${esc(c.t)}"><img loading="lazy" src="${c.img}" alt=""><span>${esc(c.t)}</span></a>`).join('')}</div>
       </div></section>
 
 
@@ -471,7 +470,7 @@
         <div class="sec-hd"><h2 class="sec-t">Популярные объявления</h2><a class="link row-l" href="#/catalog" data-act="homePop">Посмотреть все ${ic('right', 14)}</a></div>
         <div class="grid">${popular.map((x) => pcard(x)).join('')}</div>
       </div></section>
-      ${V('how') === 'on' ? howBlock('band white') : ''}
+      ${howBlock('band white')}
 
       <section class="band"><div class="wrap">
         <div class="sec-hd"><h2 class="sec-t">Продавцы с лучшими отзывами</h2><a class="link row-l" href="#/" ${soon('Раздел «Продавцы» соберём отдельным блоком')}>Все продавцы ${ic('right', 14)}</a></div>
@@ -524,8 +523,7 @@
   }
   const fOn = (k) => { const c = S.cat; if (k === 'cat') return !!c.node; if (k === 'price') return !!(c.min || c.max); if (k === 'geo') return c.city !== 'Все' || c.country !== 'Все'; return !!(c.f[k] && c.f[k].length); };
   /* Фильтры раскрыты: так ими чаще пользуются. Без фасетного индекса результат показываем по кнопке */
-  const filterBtn = () => V('filters') === 'btn' && window.innerWidth >= 1024;
-  function pend(sel) { if (!filterBtn()) return; if (!ui.applied) ui.applied = JSON.parse(JSON.stringify(S.cat)); ui.fTip = sel; }
+  function pend(sel) { if (window.innerWidth < 1024) return; if (!ui.applied) ui.applied = JSON.parse(JSON.stringify(S.cat)); ui.fTip = sel; }
   function placeTip() {
     const t = document.getElementById('fltTip'); if (!t) return;
     const a = ui.fTip && document.querySelector(ui.fTip); if (!a) { t.hidden = true; return; }
@@ -665,9 +663,7 @@
         <div><dt>На площадке</dt><dd>${esc(s.stazh)}</dd></div>
         <div><dt>Срок отправки</dt><dd>до ${esc(s.shipWait)}</dd></div>
         <div><dt>Вероятность задержки</dt><dd>${s.late}%</dd></div>
-        ${V('sellerBox') === 'full' && ui.sellerMore ? `<div><dt>Подписчики</dt><dd>13</dd></div><div><dt>Выполнено заказов</dt><dd>${s.done || 231}</dd></div><div><dt>Сделано покупок</dt><dd>115</dd></div><div><dt>Срок ожидания оплаты</dt><dd>${esc(s.payWait)}</dd></div>` : ''}
       </dl>
-      ${V('sellerBox') === 'full' ? `<button class="linkbtn" data-act="sellerMore">${ui.sellerMore ? 'Свернуть' : 'Показать всё'} ${ic(ui.sellerMore ? 'up' : 'down', 16)}</button>` : ''}
       <div class="seller-act">
         ${own ? '' : isAuth() ? `<button class="seller-l ${subd ? 'on' : ''}" data-act="sub" data-id="${it.seller}" aria-pressed="${subd}">${ic('bell', 24)}<span>${subd ? 'Вы подписаны' : 'Подписаться'}</span></button>` : `<button class="seller-l" data-act="loginFor" data-text="Войдите, чтобы подписаться: новые объявления продавца будут приходить в уведомления">${ic('bell', 24)}<span>Подписаться</span></button>`}
         <a class="seller-l" href="#/" ${page}>${ic('grid', 24)}<span>Все товары</span></a>
@@ -675,7 +671,7 @@
       </div>
     </section>`;
   }
-  const stockTxt = (it) => (V('stock') === 'num' ? `В наличии: ${it.stock} шт.` : 'В наличии');
+  const stockTxt = (it) => `В наличии: ${it.stock} шт.`;
   const favBtn = (it, fav) => `<button class="icon-btn line lg ${fav ? 'fav-on' : ''}" data-act="fav" data-id="${it.id}" aria-label="В избранное" aria-pressed="${fav}">${ic('heart', 22)}</button>`;
   function buyBlock(it) {
     const s = SELLERS[it.seller]; const out = S.flags.soldOut; const c = inCart(it.id); const fav = S.favs.includes(it.id);
@@ -860,7 +856,6 @@
     return `<section class="sec"><div class="sec-hd"><h2 class="h2">Вы смотрели</h2></div><div class="${open ? 'grid' : 'scroller'}">${ids.slice(0, open ? 8 : 4).map((id) => pcard(byId(id))).join('')}</div>${ids.length > 4 ? `<div class="sec-more"><button class="btn secondary" data-act="viewedT">${open ? 'Свернуть' : 'Показать ещё'}</button></div>` : ''}</section>`;
   }
   function recsBlock(exclude, title) {
-    if (V('recs') === 'off') return '';
     const ids = REC_IDS.filter((id) => !exclude.includes(id) && !S.viewed.slice(0, 4).includes(id)).slice(0, 4);
     return `<section class="sec"><div class="sec-hd"><h2 class="h2">${title || 'Может понравиться'}</h2></div><div class="scroller">${ids.map((id) => pcard(byId(id))).join('')}</div></section>`;
   }
@@ -876,9 +871,8 @@
         <div class="empty"><div class="ico">${ic('cart', 28)}</div><p class="h3">В корзине пока пусто</p><p class="c2" style="margin:4px 0 16px">Найдите нужное в каталоге или через поиск</p><a class="btn primary" href="#/catalog">Перейти в каталог</a></div>
         ${viewedBlock([])}</div>`;
     }
-    const cartFee = (g) => (S.co.pay[g.sid] === 'safe' && V('safe') !== 'off' ? safeFee(g.sum) : 0);
-    const fees = on.reduce((a, g) => a + cartFee(g), 0);
-    const safeQty = on.filter(cartFee).reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
+    const fees = on.reduce((a, g) => a + coFee(g), 0);
+    const safeQty = on.filter(coFee).reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
     const total = on.reduce((a, g) => a + g.sum, 0) + fees;
     const count = on.reduce((a, g) => a + g.lines.reduce((x, l) => x + l.qty, 0), 0);
     const anyOut = S.cart.some(isOut); const minBad = on.some(minProblem);
@@ -904,7 +898,6 @@
                 ${need ? `<div class="note warn" role="status">${ic('alert')}<div class="body">Минимальная сумма заказа у продавца ${fmt(g.seller.minSum)}. Доберите товаров на ${fmt(need)}</div></div>` : ''}
                 ${free && !need ? `<div class="note ok">${ic('truck')}<div class="body">${gOn && gOn.sum >= free ? 'Бесплатная доставка!' : `Добавьте товаров на ${fmt(free - (gOn ? gOn.sum : 0))}, чтобы получить бесплатную доставку`}</div></div>` : ''}
               </div>` : ''}
-              ${V('safe') === 'cart' && sellerSafe(g.seller) ? `<label class="safe-row"><span class="safe-ic">${ic('shield', 20)}</span><span class="safe-t"><b>Безопасная сделка</b><span class="t12 c2">Деньги у нас, пока вы не получите заказ. Комиссия 5%: ${fmt(safeFee(gOn ? gOn.sum : 0))}</span></span><span class="sw"><input type="checkbox" data-act-chg="safe" data-s="${g.sid}" ${S.co.pay[g.sid] === 'safe' ? 'checked' : ''} aria-label="Безопасная сделка"><i></i></span></label>` : ''}
               ${relatedBlock(g)}
             </section>`;
           }).join('')}
@@ -962,7 +955,7 @@
     return DELIVERY[d].price + (S.co.surcharge && S.co.surcharge[g.sid] ? S.co.surcharge[g.sid] : 0);
   };
   const promoOff = (g) => (S.co.promo[g.sid] === 'MINI10' ? Math.round(g.sum * 0.1) : 0);
-  const coFee = (g) => (S.co.pay[g.sid] === 'safe' && V('safe') !== 'off' ? safeFee(g.sum) : 0);
+  const coFee = (g) => (S.co.pay[g.sid] === 'safe' ? safeFee(g.sum) : 0);
   const orderTotal = (g) => g.sum - promoOff(g) + (dlPrice(g) || 0) + coFee(g);
   const certOff = (sum) => (S.co.cert === 'GIFT500' ? Math.min(500, sum) : 0);
   const grand = () => { const v = coGroups().reduce((a, g) => a + orderTotal(g), 0); return v - certOff(v); };
@@ -1313,7 +1306,7 @@
     return '';
   }
   function lkManage(o) {
-    const next = V('logic') === 'next'; const a = [];
+    const next = route().q.demo === 'change-order'; const a = [];
     if (o.st === 'sent') a.push(`<button class="btn secondary block" data-act="soon" data-text="Ссылка ведёт на отслеживание у перевозчика">Отследить посылку</button>`);
     if (o.st === 'sent') a.push(`<button class="btn secondary block" data-act="cfm" data-k="openDispute" data-no="${o.no}">Открыть спор</button>`);
     if (o.st === 'dispute' && o.by === 'buyer') a.push(`<button class="btn secondary block" data-act="cfm" data-k="closeDispute" data-no="${o.no}">Закрыть спор</button>`);
@@ -1452,16 +1445,12 @@
     const urgent = l.end - Date.now() <= URGENT_MS;
     const dl = s.deliveries.map((d) => DELIVERY[d].title).join(', ');
     const reserve = x.reserve ? `<span class="tag ${l.price >= x.reserve ? 'ok' : 'warn'}">${l.price >= x.reserve ? 'Резерв достигнут' : 'Резерв не достигнут'}</span>` : '';
-    const T = V('timer'); const left = l.end - Date.now();
     const cell = (k, t) => `<span><b data-c="${k}"></b><i>${t}</i></span>`;
-    const liveHead = T === 'price' ? '' : T === 'line' ? `<div class="bt-line ${urgent ? 'urgent' : ''}" data-tw><span class="bt-l">До конца торгов</span><b data-end="${l.end}"></b></div>`
-      : T === 'cells' ? `<div class="bt-cells ${urgent ? 'urgent' : ''}" data-tw data-cells="${l.end}"><p class="bt-l">До конца торгов</p><div class="bt-row">${cell('h', 'часов')}${cell('m', 'минут')}${cell('s', 'секунд')}</div></div>`
-      : T === 'bar' ? `<div class="bt-bar ${urgent ? 'urgent' : ''}" data-tw><div class="between"><span>Осталось <b data-left="${l.end}"></b></span><span class="c2">до ${esc(atH(a.hours))}</span></div><i><u style="width:${Math.max(4, Math.min(100, Math.round(left / (72 * 3600000) * 100)))}%"></u></i></div>`
-      : `<div class="bid-timer ${urgent ? 'urgent' : ''}" data-tw><span class="t12">До конца торгов</span><b data-end="${l.end}"></b><span class="t12">Окончание ${atH(a.hours)}</span></div>`;
-    const head = l.over ? `<div class="bid-end"><span class="sb">Торги завершены</span><span class="t12 c2">${atH(-2)}</span></div>` : liveHead;
+    const head = l.over ? `<div class="bid-end"><span class="sb">Торги завершены</span><span class="t12 c2">${atH(-2)}</span></div>`
+      : `<div class="bt-cells ${urgent ? 'urgent' : ''}" data-cells="${l.end}"><p class="bt-l">До конца торгов</p><div class="bt-row">${cell('h', 'часов')}${cell('m', 'минут')}${cell('s', 'секунд')}</div></div>`;
     const meta = `<button class="linkbtn" data-act="bidsOpen" data-id="${a.id}">${l.bids ? `${l.bids} ${plural(l.bids, 'ставка', 'ставки', 'ставок')}` : 'Ставок пока нет'}</button>${reserve}`;
     const priceL = `<div><p class="t12 c2">${l.over ? 'Последняя ставка' : l.bids ? 'Текущая ставка' : 'Стартовая цена'}</p><p class="price-big">${fmt(l.price)}</p></div>`;
-    const price = T === 'price' && !l.over ? `<div class="bid-pair">${priceL}<div class="bt-pair ${urgent ? 'urgent' : ''}" data-tw><p class="t12 c2">До конца торгов</p><b data-end="${l.end}"></b></div></div><div class="bid-meta row-m">${meta}</div>` : `<div class="bid-now">${priceL}<div class="bid-meta">${meta}</div></div>`;
+    const price = `<div class="bid-now">${priceL}<div class="bid-meta">${meta}</div></div>`;
     let note = '';
     if (ls.st === 'lead') note = `<div class="note ok">${ic('check')}<div class="body">Вы лидируете со ставкой ${fmt(ls.my)}${ls.auto ? `. Автоставка до ${fmt(ls.auto)}: поднимем ставку, если её перебьют` : ''}</div></div>`;
     if (ls.st === 'outbid') note = `<div class="note warn">${ic('alert')}<div class="body">Вашу ставку ${fmt(ls.my)} перебили. Поставьте от ${fmt(l.next)}, чтобы вернуться в лидеры</div></div>`;
@@ -1660,22 +1649,18 @@
     }, { passive: true });
   }
   function notify() {
-    if (parent !== window) parent.postMessage({ type: 'mfm-state', route: route().name === 'lk' && route().id === 'auctions' ? 'bids' : route().name, flags: S.flags, vars: S.vars, lotSt: S.lotDemo, cart: S.cart.length, hasOrders: !!S.orders }, '*');
+    if (parent !== window) parent.postMessage({ type: 'mfm-state', route: route().name === 'lk' && route().id === 'auctions' ? 'bids' : route().name, flags: S.flags, lotSt: S.lotDemo, cart: S.cart.length, hasOrders: !!S.orders }, '*');
   }
   function tick() {
     document.querySelectorAll('[data-end]').forEach((e) => {
       const ms = +e.dataset.end - Date.now(); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
-      (e.closest('[data-tw]') || e.parentNode).classList.toggle('urgent', ms <= URGENT_MS);
+      e.parentElement.classList.toggle('urgent', ms <= URGENT_MS);
       e.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     });
     document.querySelectorAll('[data-cells]').forEach((w) => {
       const ms = +w.dataset.cells - Date.now(); const v = { h: Math.floor(ms / 3600000), m: Math.floor(ms / 60000) % 60, s: Math.floor(ms / 1000) % 60 };
       w.classList.toggle('urgent', ms <= URGENT_MS);
       w.querySelectorAll('[data-c]').forEach((b) => { b.textContent = String(v[b.dataset.c]).padStart(2, '0'); });
-    });
-    document.querySelectorAll('[data-left]').forEach((e) => {
-      const ms = +e.dataset.left - Date.now(); const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, sec = Math.floor(ms / 1000) % 60;
-      e.textContent = h >= 24 ? `${Math.floor(h / 24)} д ${h % 24} ч` : h ? `${h} ч ${m} мин` : `${m} мин ${sec} с`;
     });
   }
   setInterval(tick, 1000);
@@ -1740,7 +1725,6 @@
     },
     toLk() { go(S.orders && S.orders.length === 1 ? `#/lk/order/${S.orders[0].no}` : '#/lk/orders'); },
     contactSave() { toast('Контакт сохранён, его увидит продавец заказа'); },
-    sellerMore() { ui.sellerMore = !ui.sellerMore; render(); },
     safePay() { lkPatch(ui.modal.pay, { st: 'paid', left: 120 }); ui.modal = null; render(); toast('Заказ оплачен, деньги у сервиса'); },
     lkTab(el) { ui.lkTab = el.dataset.v; render(); },
     payOpen(el) { ui.rc = null; ui.modal = { pay: +el.dataset.no }; overlay(); },
@@ -1953,7 +1937,6 @@
     }
     if (t.dataset.actChg === 'line') { inCart(t.dataset.id).on = t.checked; save(); render(); return; }
     if (t.dataset.actChg === 'all') { S.cart.forEach((c) => { c.on = t.checked; }); save(); render(); return; }
-    if (t.dataset.actChg === 'safe') { if (t.checked) S.co.pay[t.dataset.s] = 'safe'; else delete S.co.pay[t.dataset.s]; save(); render(); return; }
     if (t.name === 'dlNew') { ui.dlNew = t.value; overlay(); return; }
     if (t.dataset.actChg === 'dl') { S.co.dl[t.dataset.s] = t.value; save(); render(); return; }
     if (t.dataset.actChg === 'pay') { S.co.pay[t.dataset.s] = t.value; save(); render(); return; }
@@ -2064,7 +2047,6 @@
       if (!ui.modal || !ui.modal.pay) ui.modal = { pay: 464811 };
       overlay();
     }
-    if (m.type === 'mfm-var') { S.vars = Object.assign({}, S.vars, { [m.key]: m.value }); ui.applied = null; ui.fTip = null; save(); render(); }
     if (m.type === 'mfm-fill') { if (!S.cart.length) preset('one'); fillForm(); ui.submitted = false; save(); render(); }
     if (m.type === 'mfm-empty-submit') { S.form = {}; S.co = DEF().co; save(); render(); setTimeout(submit, 0); }
     if (m.type === 'mfm-reset') { S = DEF(); save(); Object.assign(ui, { submitted: false, touched: {}, opened: {} }); go('#/'); render(); }

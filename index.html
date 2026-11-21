@@ -41,7 +41,6 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
 .ctl button.act { text-align: left; padding: 6px 8px; border-radius: 4px; background: var(--bg2); color: var(--t); }
 .ctl button.act:hover { background: var(--line); }
 .tgl { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 4px; background: var(--bg2); cursor: pointer; }
-.var { display: grid; gap: 4px; padding: 6px 8px; border-radius: 4px; background: var(--bg2); } .var .seg { background: var(--bg); justify-self: start; flex-wrap: wrap; }
 .tgl input { accent-color: #fb3939; margin: 0; }
 .sel { width: 100%; background: var(--bg2); color: var(--t); border: 0; padding: 6px; border-radius: 4px; font: inherit; }
 .ann { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
@@ -66,11 +65,11 @@ iframe { display: block; width: 100%; height: 100%; border: 0; }
   <div class="route-nav"><nav class="steps" id="steps" aria-label="Разделы прототипа"></nav><nav class="steps" id="orderSteps" aria-label="Этапы заказа" hidden></nav></div>
   <div class="seg" id="widths" aria-label="Ширина экрана"></div>
   <button class="lnk" id="sideBtn">Панель</button>
-  <a class="lnk" href="app.html?v=94" target="_blank">Без панели</a>
+  <a class="lnk" href="app.html?v=95" target="_blank">Без панели</a>
 </div>
 <div class="main">
   <div class="stage" id="stage">
-    <div class="frame-box" id="box"><iframe id="f" src="app.html?v=94#/" title="Прототип"></iframe></div>
+    <div class="frame-box" id="box"><iframe id="f" src="app.html?v=95#/" title="Прототип"></iframe></div>
     <span class="scale" id="scale" hidden></span>
   </div>
   <aside class="side" id="side"></aside>
@@ -98,7 +97,7 @@ const NOTES = {
     ['Категории в фильтрах по шагам', 'Перенесли ряды категорий в фильтры и показываем их по шагам: раздел, группа, подраздел, чтобы не искать нужное в длинном дереве и всегда видеть путь назад', 'CJM 1, этап 1. RICE 6'],
     ['Короткие списки', 'Ограничили категории пятью пунктами до «Ещё», чтобы цена и продавец не уезжали вниз', 'UX'],
     ['Фильтры раскрыты', 'Раскрыли все фильтры, чтобы ими чаще пользовались', 'Обсуждение в Miro'],
-    ['Кнопка «Показать» у фильтра', 'Показываем подсказку с числом найденного рядом с изменённым фильтром, чтобы не нагружать поиск на каждый клик: без фасетного индекса применять сразу нельзя. На телефоне кнопка закреплена внизу', 'Обсуждение в Miro. Для разработки: вариант «Сразу» требует индекс', 1],
+    ['Кнопка «Показать» у фильтра', 'Показываем подсказку с числом найденного рядом с изменённым фильтром, чтобы не нагружать поиск на каждый клик: без фасетного индекса применять сразу нельзя. На телефоне кнопка закреплена внизу', 'Обсуждение в Miro. Для разработки', 1],
     ['Кнопка вместо значка', 'Заменили маленький значок корзины на красную кнопку рядом с ценой, чтобы главное действие было заметно в выдаче', 'UX. RICE 7'],
     ['Количество в карточке', 'Показываем счётчик вместо кнопки после добавления, чтобы менять количество, не уходя из выдачи', 'UX'],
     ['Адаптив: фото крупнее, текста меньше', 'Убрали поля и зазоры почти до нуля, сделали фото выше, убрали город, а кнопку поставили вниз, чтобы фото работало на выбор и на экране помещалось больше товаров', 'UX'],
@@ -122,7 +121,7 @@ const NOTES = {
     ['Звёзды у каждого отзыва', 'Показали оценку звёздами вместо «положительный» и «отрицательный», чтобы отзывы читались быстрее. Нужно хранить оценку каждого отзыва: сейчас на сайте средний балл и знак отзыва, в прототипе разбивка примерная', '', true],
   ],
   cart: [
-    ['Безопасная сделка', 'Показываем выбор в корзине или на оплате с комиссией в итоге: от выбора зависят итог, способ оплаты и шаги заказа', 'Обсуждение в Miro. Комиссия примерная. Для разработки', 1],
+    ['Безопасная сделка', 'Предлагаем безопасную сделку на шаге оплаты и показываем комиссию в итоге: от выбора зависят сумма и шаги заказа', 'Обсуждение в Miro. Комиссия примерная. Для разработки', 1],
     ['«Будет 2 заказа»', 'Предупреждаем заранее, что у каждого продавца свой заказ, срок и оплата, чтобы две оплаты не стали сюрпризом', 'Flow 4'],
     ['Итог по каждому продавцу', 'Показали сумму в группе и в сводке, чтобы было понятно, сколько платить и кому', 'CJM 1, этап 4. RICE 14'],
     ['Доставка отдельно', 'Написали, что доставка считается на следующем шаге, чтобы итог не вызывал вопросов и не приводил к отменам из-за неожиданной суммы', 'CJM 1, этап 4. RICE 14'],
@@ -171,7 +170,7 @@ const NOTES = {
     ['Подтверждение получения', 'Развели «Заказ получен» и спор: спор открывается из окна подтверждения с понятным предупреждением', 'Поддержка'],
     ['Отзыв', 'Подписали поле «Ваш отзыв», убрали готовую пятёрку и показали ошибки по каждому полю', 'Находки сайта'],
     ['Отзыв на отменённый заказ', 'Оставили отзыв, если заказ был в обработке, как на сайте', 'Обсуждение в Miro'],
-    ['Отмена после оплаты и смена доставки', 'В варианте «С новой логикой» показываем запрос к продавцу, чтобы закрыть ручные обращения', 'Поддержка. Для разработки: логики на сайте нет', 1],
+    ['Отмена после оплаты и смена доставки', 'В примере «Смена доставки и отмена после оплаты» показываем запрос к продавцу', 'Поддержка. Для разработки: логики на сайте нет', 1],
   ],
   lot: [
     ['Страница лота', 'Собрали лот по образцу карточки товара: фото и таймер главные, ставка рядом', 'Flow 3. CJM 3'],
@@ -200,26 +199,16 @@ const HINTS = {
   lot: ['Код подтверждения почты 1234', 'Свой аукцион виден при роли продавца'],
   bids: ['Выберите «Вошёл, покупатель» в блоке «Кто смотрит»'],
   checkout: ['Промокод MINI10, сертификат GIFT500. Любой другой покажет ошибку', 'Наличные видны только при самовывозе'],
-  success: ['Варианты «Email есть в базе» и «Автоподтверждение у PRO» переключаются выше'],
+  success: ['Состояния «Email есть в базе» и «Автоподтверждение у PRO» переключаются выше'],
 };
 
 const LOTS = [['live', 'Идут торги'], ['lead', 'Вы лидируете'], ['outbid', 'Ставку перебили'], ['auto', 'Есть автоставка'], ['won', 'Вы выиграли'], ['lost', 'Выиграл другой'], ['reserve', 'Резерв не достигнут'], ['ended', 'Завершён без ставок']];
 const ROLES = [['guest', 'Не вошёл'], ['buyer', 'Вошёл, покупатель'], ['seller', 'Вошёл, продавец своего лота']];
 
-const VARS = {
-  home: [['adv', 'Преимущества', [['direct', 'Оплата напрямую'], ['safe', 'Безопасная сделка']]], ['cats', 'Категории', [['two', 'Два ряда'], ['one', 'Один со скроллом']]], ['city', 'Город продавца', [['on', 'Есть'], ['off', 'Нет']]], ['plaques', 'Плашки на фото', [['off', 'Нет'], ['on', 'Есть']]], ['how', '«Как проходит покупка»', [['on', 'Есть'], ['off', 'Нет']]], ['sellerGoods', 'Товары у продавца', [['2', '2'], ['4', '4']]], ['clubs', 'Клубы и мероприятия', [['3', '3'], ['6', '6']]]],
-  catalog: [['filters', 'Фильтры на десктопе', [['btn', 'С кнопкой'], ['live', 'Сразу']]], ['city', 'Город продавца', [['on', 'Есть'], ['off', 'Нет']]], ['plaques', 'Плашки на фото', [['off', 'Нет'], ['on', 'Есть']]]],
-  item: [['stock', 'Наличие', [['num', 'С числом'], ['plain', 'Без числа']]], ['sellerBox', 'Блок продавца', [['short', 'Короткий'], ['full', 'С полями']]], ['recs', 'Рекомендации', [['on', 'Есть'], ['off', 'Нет']]]],
-  cart: [['safe', 'Безопасная сделка', [['cart', 'В корзине'], ['pay', 'На оплате'], ['off', 'Нет']]], ['recs', 'Рекомендации', [['on', 'Есть'], ['off', 'Нет']]]],
-  checkout: [['safe', 'Безопасная сделка', [['cart', 'В корзине'], ['pay', 'На оплате'], ['off', 'Нет']]]],
-  lot: [['timer', 'Таймер лота', [['price', 'Рядом с ценой'], ['line', 'Строка'], ['cells', 'Ячейки'], ['bar', 'Шкала'], ['block', 'Блоком']]]],
-  lk: [['logic', 'Заказ', [['now', 'Как сейчас'], ['next', 'С новой логикой']]]],
-};
-
 const CTRLS = {
   home: [],
   catalog: [],
-  lk: [{ t: 'go', l: 'Открыть заказ', h: '#/lk/order/464811' }, { t: 'go', l: 'Заказ с безопасной сделкой', h: '#/lk/order/464808' }, { t: 'flag', k: 'noOrders', l: 'Нет заказов' }, { t: 'flag', k: 'minus', l: 'Минус на балансе' }, { t: 'flag', k: 'rcFail', l: 'Сбой загрузки чека' }, { t: 'msg', m: { type: 'mfm-rc', value: 'ok' }, l: 'Окно оплаты: файл выбран' }, { t: 'msg', m: { type: 'mfm-rc', value: 'big' }, l: 'Окно оплаты: файл больше 20 МБ' }, { t: 'msg', m: { type: 'mfm-rc', value: 'bad' }, l: 'Окно оплаты: неверный формат' }],
+  lk: [{ t: 'go', l: 'Открыть заказ', h: '#/lk/order/464811' }, { t: 'go', l: 'Заказ с безопасной сделкой', h: '#/lk/order/464808' }, { t: 'go', l: 'Смена доставки и отмена после оплаты', h: '#/lk/order/464806?demo=change-order' }, { t: 'flag', k: 'noOrders', l: 'Нет заказов' }, { t: 'flag', k: 'minus', l: 'Минус на балансе' }, { t: 'flag', k: 'rcFail', l: 'Сбой загрузки чека' }, { t: 'msg', m: { type: 'mfm-rc', value: 'ok' }, l: 'Окно оплаты: файл выбран' }, { t: 'msg', m: { type: 'mfm-rc', value: 'big' }, l: 'Окно оплаты: файл больше 20 МБ' }, { t: 'msg', m: { type: 'mfm-rc', value: 'bad' }, l: 'Окно оплаты: неверный формат' }],
   lot: [{ t: 'lot' }, { t: 'flag', k: 'noEmail', l: 'Почта не подтверждена' }, { t: 'flag', k: 'minus', l: 'Минус на балансе' }, { t: 'go', l: 'Открыть свой аукцион', h: '#/lot/a-own' }, { t: 'go', l: 'Лот с резервом', h: '#/lot/a-leman' }, { t: 'go', l: 'Лот с блиц-ценой', h: '#/lot/a-guilliman' }],
   bids: [{ t: 'flag', k: 'noBids', l: 'Не участвовал в торгах' }],
   item: [{ t: 'flag', k: 'soldOut', l: 'Нет в наличии' }],
@@ -260,8 +249,6 @@ function drawSide() {
   const c = (CTRLS[st.route] || []).filter((x) => !x.guest || !st.flags.role || st.flags.role === 'guest');
   const n = NOTES[st.route] || [];
   const hints = HINTS[st.route] || [];
-  const vs = VARS[st.route] || [];
-  const vHtml = vs.map(([k, l, o]) => { const cur = (st.vars && st.vars[k]) || o[0][0]; return `<div class="var"><span>${l}</span><div class="seg">${o.map(([v, t]) => `<button data-var="${k}" data-v="${v}" class="${cur === v ? 'on' : ''}">${t}</button>`).join('')}</div></div>`; }).join('');
   const ctl = c.map((x) => {
     if (x.t === 'flag') return `<label class="tgl"><span>${x.l}</span><input type="checkbox" data-flag="${x.k}" ${st.flags[x.k] ? 'checked' : ''}></label>`;
     if (x.t === 'preset') return `<button class="act" data-preset="${x.n}">${x.l}</button>`;
@@ -274,7 +261,7 @@ function drawSide() {
     return '';
   }).join('');
   const roles = ROLES.map(([v, t]) => `<option value="${v}" ${(st.flags.role || 'guest') === v ? 'selected' : ''}>${t}</option>`).join('');
-  $('#side').innerHTML = `<button class="lnk side-x" id="sideClose">Скрыть панель</button><h2>Кто смотрит</h2><select class="sel" data-sel="role" aria-label="Кто смотрит">${roles}</select>${vHtml ? `<h2>Варианты</h2><div class="ctl">${vHtml}</div>` : ''}${ctl ? `<h2>Состояния</h2><div class="ctl">${ctl}</div>` : ''}
+  $('#side').innerHTML = `<button class="lnk side-x" id="sideClose">Скрыть панель</button><h2>Кто смотрит</h2><select class="sel" data-sel="role" aria-label="Кто смотрит">${roles}</select>${ctl ? `<h2>Состояния</h2><div class="ctl">${ctl}</div>` : ''}
     <h2>Что изменили и почему</h2>
     <ul class="ann">${n.map(([a, b, r, dev]) => `<li class="${dev ? 'dev' : ''}"><b>${nb(a)}</b>${nb(b)}${r ? `<span class="ref">${r}</span>` : ''}</li>`).join('')}</ul>
     ${hints.length ? `<h2>Как проверить</h2><ul class="ann">${hints.map((t) => `<li>${nb(t)}</li>`).join('')}</ul>` : ''}
@@ -282,14 +269,13 @@ function drawSide() {
 }
 window.addEventListener('message', (e) => {
   if (!e.data || e.data.type !== 'mfm-state') return;
-  const changed = e.data.route !== st.route || JSON.stringify(e.data.flags) !== JSON.stringify(st.flags) || JSON.stringify(e.data.vars) !== JSON.stringify(st.vars) || e.data.lotSt !== st.lotSt;
+  const changed = e.data.route !== st.route || JSON.stringify(e.data.flags) !== JSON.stringify(st.flags) || e.data.lotSt !== st.lotSt;
   st = e.data; drawTop(); if (changed) drawSide();
 });
 document.addEventListener('click', (e) => {
   const t = e.target;
   if (t.dataset.s) { const s = STEPS.find(([k]) => k === t.dataset.s); send({ type: 'mfm-go', hash: s[2] }); }
   if (t.dataset.w !== undefined) { width = +t.dataset.w; try { localStorage.setItem('mfm-width', width); } catch (e2) { /* без хранилища */ } drawTop(); layout(); }
-  if (t.dataset.var) { send({ type: 'mfm-var', key: t.dataset.var, value: t.dataset.v }); return; }
   if (t.dataset.msg) send(JSON.parse(t.dataset.msg));
   if (t.dataset.go) send({ type: 'mfm-go', hash: t.dataset.go });
   if (t.dataset.preset) send({ type: 'mfm-preset', name: t.dataset.preset });

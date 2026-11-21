@@ -848,21 +848,8 @@
 .hdr-search input:not(:placeholder-shown) { padding-right: 88px; }
 .hdr-search input:not(:placeholder-shown) ~ .hdr-search-do { display: block; }
 .hdr-sell { flex: none; margin: 0 4px; }
-.tiles.one { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; }
-.tiles.one::-webkit-scrollbar { display: none; }
-.tiles.one .tile { flex: 0 0 180px; }
-.pc-plaque { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 2px 8px; border-radius: var(--r-sm); background: var(--surface); font-size: 12px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .flt { position: relative; }
 .flt-tip { position: absolute; left: calc(100% + 8px); top: 0; z-index: 12; padding: 4px; background: var(--surface); border-radius: var(--r-md); box-shadow: 0 8px 24px rgba(24, 24, 27, .16); white-space: nowrap; }
-.safe-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border-subtle); cursor: pointer; }
-.safe-ic { color: var(--green); display: flex; }
-.safe-t { flex: 1; min-width: 0; display: grid; }
-.sw { position: relative; flex: none; width: 40px; height: 24px; }
-.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
-.sw i { position: absolute; inset: 0; border-radius: 12px; background: var(--border-strong); transition: background .15s; }
-.sw i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
-.sw input:checked + i { background: var(--green); }
-.sw input:checked + i::after { transform: translateX(16px); }
 .sub-box { align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .sub-box .btn img { flex: none; }
 .contact-row .inp { flex: 1; min-width: 0; }
@@ -935,9 +922,6 @@
 .rate-in button svg { width: 28px; height: 28px; }
 .rate-in button:not(.on) svg, .rate-in button:not(.on) svg * { fill: currentColor; }
 /* Лот */
-.bid-timer { display: grid; gap: 2px; padding: 12px; border-radius: var(--r-md); background: var(--surface-inverse); color: #fff; }
-.bid-timer b { font-size: 24px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.bid-timer.urgent { background: var(--brand); }
 .bid-end { display: flex; justify-content: space-between; gap: 12px; padding: 12px; border-radius: var(--r-md); background: var(--surface-muted); }
 .bid-now { display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; }
 .bid-meta { display: grid; gap: 4px; justify-items: end; }
@@ -963,7 +947,6 @@
 .pc-rev { gap: 3px; }
 .pc-rev .i { fill: #c4c4ca; }
 .pc-rev span { font-weight: 400; color: var(--text-2); white-space: nowrap; }
-.pc-plaque { left: 8px; top: 8px; bottom: auto; max-width: calc(100% - 16px); padding: 4px 8px; border-radius: var(--r-md); background: var(--green); color: #fff; font-weight: 600; z-index: 2; }
 .pc-timer, .pc-timer.urgent, .grid.as-list .pc-timer { background: var(--surface); color: var(--text); }
 .pc-timer.urgent { color: var(--brand); }
 .flt-tip { position: fixed; left: 0; top: 0; z-index: 30; padding: 4px; border-radius: var(--r-md); }
@@ -977,8 +960,6 @@
   .sell-row > * { flex: 0 0 280px; }
 }
 /* Лот: спокойные подложки */
-.bid-timer, .bid-timer.urgent { background: var(--surface-muted); color: var(--text); }
-.bid-timer.urgent b { color: var(--brand); }
 .card.buy .note.info, .card.buy .note.ok, .card.buy .note.warn, .card.buy .note.bad { border-color: transparent; }
 .btn.blitz { background: var(--surface-inverse); color: #fff; }
 .btn.blitz:hover { background: #000; }
@@ -1018,24 +999,14 @@ dl.info { display: grid; gap: 8px; margin: 0; }
 .rate-in button.on { color: var(--gold, #eeb250); }
 .rate-in button svg, .rate-in button:not(.on) svg, .rate-in button:not(.on) svg * { fill: currentColor; }
 
-/* Таймер лота: варианты */
+/* Таймер лота */
 .bt-l { color: var(--text-2); }
-.urgent b, .bt-cells.urgent b, .bt-pair.urgent b { color: var(--brand); }
-.bt-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-subtle); }
-.bt-line b { font-size: 20px; line-height: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.urgent b { color: var(--brand); }
 .bt-cells { display: grid; gap: 4px; }
 .bt-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .bt-row span { display: grid; justify-items: center; padding: 8px 4px; border-radius: var(--r-md); background: var(--surface-muted); }
 .bt-row b { font-size: 24px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .bt-row i { font-style: normal; font-size: 13px; line-height: 16px; color: var(--text-2); }
-.bt-bar { display: grid; gap: 8px; }
-.bt-bar b { font-weight: 700; }
-.bt-bar i { display: block; height: 6px; border-radius: 3px; background: var(--surface-subtle); overflow: hidden; }
-.bt-bar u { display: block; height: 100%; background: var(--surface-inverse); text-decoration: none; }
-.bt-bar.urgent u { background: var(--brand); }
-.bid-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: end; }
-.bt-pair b { display: block; font-size: 24px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.bid-meta.row-m { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 /* Поле ставки соразмерно кнопке */
 .bid-f { gap: 4px; }
@@ -1061,10 +1032,6 @@ dl.info { display: grid; gap: 8px; margin: 0; }
 .bdg.safe { background: #d9e8fc; color: #1c5aa8; }
 .bdg-s { display: none; }
 @media (max-width: 1023px) { .bdg-l { display: none; } .bdg-s { display: inline; } }
-.pc-plaques { position: absolute; left: 8px; top: 8px; z-index: 2; display: grid; justify-items: start; gap: 4px; max-width: calc(100% - 16px); pointer-events: none; }
-.pc-plaques .bdg { padding: 4px 8px; border-radius: var(--r-md); color: #fff; }
-.pc-plaques .bdg.free { background: #4a7c1c; }
-.pc-plaques .bdg.safe { background: #1f6fd1; }
 .d-tags { margin-top: 16px; }
 .err-t { font-size: 14px; line-height: 20px; }
 .err-t .i { flex: none; width: 16px; height: 16px; margin-top: 2px; }

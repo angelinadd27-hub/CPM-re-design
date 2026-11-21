@@ -485,8 +485,8 @@
       </div></section>
 
       <section class="band"><div class="wrap"><div class="promo">
-        <div class="promo-t"><h2 class="sec-t">Есть что продать?</h2><p>Разместите объявление: его увидят игроки и коллекционеры</p><button class="btn primary lg" ${soon('Продажа это отдельный сценарий, соберём его позже')}>Разместить объявление</button></div>
-        <div class="promo-f" aria-hidden="true"><img class="f1" src="assets/cut-skorpekh.png" alt=""><img class="f2" src="assets/cut-strudd.png" alt=""></div>
+        <div class="promo-t"><h2>Есть что продать?</h2><p>Разместите объявление и его увидят игроки и коллекционеры</p><button class="btn primary lg" ${soon('Продажа это отдельный сценарий, соберём его позже')}>Разместить объявление</button></div>
+        <img class="promo-f" src="assets/sell-banner.png" width="1672" height="941" alt="" loading="lazy">
       </div></div></section>`;
   }
 

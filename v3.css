@@ -280,21 +280,23 @@
 /* Как проходит покупка */
 .band.white .how li { background: var(--surface-muted); }
 
-/* Рекламный блок */
-.promo { position: relative; display: grid; align-items: center; background: var(--surface-inverse); color: #fff; border-radius: var(--r-xl); padding: 24px; overflow: hidden; min-height: 280px; }
-.promo-t { position: relative; z-index: 2; display: grid; gap: 8px; justify-items: start; max-width: 460px; }
-.promo-t p { color: #cfcfd4; font-size: 16px; line-height: 24px; }
-.promo-t .btn { margin-top: 8px; }
-.promo-f { position: relative; height: 240px; margin-top: 16px; }
-.promo-f img { position: absolute; bottom: -24px; object-fit: contain; height: auto; }
-.promo-f .f1 { width: 62%; left: 0; z-index: 1; }
-.promo-f .f2 { width: 50%; right: 0; z-index: 2; }
+/* Баннер «Есть что продать?» */
+.promo { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; background: var(--surface-inverse); color: var(--text-inverse); border-radius: var(--r-xl); }
+.promo-t { position: relative; z-index: 1; display: grid; gap: 8px; justify-items: start; margin: 24px 24px 0; }
+.promo-t h2 { font-size: 20px; line-height: 28px; font-weight: 700; }
+.promo-t p { color: rgb(255 255 255 / .8); font-size: 16px; line-height: 24px; }
+.promo-t .btn { margin-top: 8px; max-width: 100%; white-space: normal; text-align: center; }
+.promo-f { display: block; justify-self: center; width: min(106.25%, 500px); max-width: none; height: auto; aspect-ratio: 374 / 210; object-fit: cover; margin-top: 70px; transform: translateX(6px); }
 @media (min-width: 768px) {
-  .promo { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); padding: 40px 48px; min-height: 340px; }
-  .promo-f { height: 300px; margin: 0; }
-  .promo-f img { bottom: -60px; }
-  .promo-f .f1 { width: 56%; left: 0; }
-  .promo-f .f2 { width: 48%; right: 0; }
+  .promo { align-items: center; min-height: clamp(300px, 26.4vw, 380px); padding-top: 12px; }
+  .promo-t { width: min(460px, calc(41% - 48px)); margin: 0 0 0 48px; }
+  .promo-t h2 { font-size: 24px; line-height: 32px; }
+  .promo-t p { font-weight: 600; }
+  .promo-f { position: absolute; right: -1.02%; bottom: -48px; width: 60.16%; aspect-ratio: 770 / 433; margin: 0; transform: none; }
+}
+@media (min-width: 1024px) {
+  .promo-t h2 { font-size: 32px; line-height: 40px; }
+  .promo-t p { font-size: 20px; line-height: 28px; }
 }
 
 /* Карточка в выдаче */
